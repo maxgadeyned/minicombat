@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Miniature Combat</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a2e;
+      color: #eee;
+      font-family: system-ui, sans-serif;
+    }
+    #gameContainer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    #gameCanvas {
+      display: block;
+      background: #16213e;
+      border: 2px solid #0f3460;
+      border-radius: 4px;
+      width: 1200px;
+      height: 700px;
+    }
+    #hud {
+      width: 1200px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 4px;
+    }
+    #hud span { font-size: 18px; font-weight: bold; }
+    #controls {
+      width: 1200px;
+      font-size: 12px;
+      color: #aaa;
+      list-style: none;
+    }
+    #controls li { margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="gameCanvas" width="1200" height="700"></canvas>
+    <div id="hud">
+      <span>Dummy: <span id="dummyDamage">0%</span></span>
+      <span>Player: <span id="playerDamage">0%</span></span>
+    </div>
+    <ul id="controls">
+      <li>Move: A / D — Jump: Space (hold for higher) — Fast fall: S</li>
+      <li>Light: J — Heavy: K — Block / Parry: L — Air Dash: W</li>
+      <li>Cycle character: C — Dummy mode: T — Reset: R</li>
+    </ul>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>
