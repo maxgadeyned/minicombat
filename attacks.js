@@ -18,7 +18,7 @@ function spawnAttackFor(attacker, owner, kind) {
   } else {
     if (kind === "light") { w = 70; h = 40; offsetX = attacker.size.w / 2 + w / 2 + 4; offsetY = 0; dirY = -0.1; }
     else {
-      const isPlayerDownHeavy = owner === "player" && keys.has("KeyS");
+      const isPlayerDownHeavy = (owner === "player" && keys.has("KeyS")) || (owner === "player2" && keys.has(p2Keybinds.fastFall));
       if (isPlayerDownHeavy) { w = 55; h = 50; offsetX = 0; offsetY = attacker.size.h / 2 + h / 2 + 4; dirY = 1; }
       else { w = 75; h = 45; offsetX = attacker.size.w / 2 + w / 2 + 4; offsetY = -attacker.size.h * 0.1; dirY = -0.35; }
     }

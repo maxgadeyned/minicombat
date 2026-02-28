@@ -1,7 +1,21 @@
 "use strict";
 
-let playerStocks = MAX_STOCKS, dummyStocks = MAX_STOCKS, roundOver = false;
-let roundTimeRemaining = ROUND_TIME_SEC;
+const GAME_STATE = { MENU: "menu", PRACTICE: "practice", VERSUS_SELECT: "versus_select", TRANSITION: "transition", VERSUS: "versus", P2_SETTINGS: "p2_settings" };
+let gameState = GAME_STATE.MENU;
+let menuSelection = 0;
+let p2SettingsSelection = 0;
+let p2RebindingAction = null;
+const P2_SETTINGS_ACTIONS = ["moveLeft", "moveRight", "jump", "fastFall", "dash", "special", "heavy", "block"];
+const P2_SETTINGS_LABELS = ["Move Left", "Move Right", "Jump", "Fast Fall", "Dash", "Special", "Heavy", "Block"];
+let p1CharacterIndex = 0, p2CharacterIndex = 0;
+let p1ColorIndex = 0, p2ColorIndex = 0;
+let transitionStartTime = 0;
+const TRANSITION_DURATION_MS = 3500;
+
+let playerStocks = MAX_STOCKS, dummyStocks = MAX_STOCKS, player2Stocks = MAX_STOCKS, roundOver = false;
+let roundOverSelection = 0;
+let gamePaused = false;
+let pauseMenuSelection = 0;
 let bestComboCount = 0, bestComboDamage = 0;
 const DUMMY_MODE_LABELS = ["PASSIVE", "ATTACK", "PARRY TRAIN"];
 let dummyMode = 1;
@@ -62,8 +76,66 @@ function handlePlayerInput(dt, now) {
   jumpPressed = false;
 }
 
+function handlePlayer2Input(dt, now) {
+  if (!player2) return;
+  const inStun = now < player2.stunnedUntil;
+  const rolling = now < player2.rollingUntil;
+
+  if (blockKeyJustPressedP2 && player2.onGround) {
+    if (now >= player2.parryLockoutUntil) {
+      player2.parryWindowUntil = now + PARRY_WINDOW_MS;
+      player2.parryLockoutUntil = now + PARRY_LOCKOUT_MS;
+    }
+  }
+  blockKeyJustPressedP2 = false;
+
+  let moveDir = 0;
+  if (!inStun) {
+    if (keys.has(p2Keybinds.moveLeft)) moveDir -= 1;
+    if (keys.has(p2Keybinds.moveRight)) moveDir += 1;
+  }
+  const moveSpeed = player2.moveSpeed || MOVE_SPEED;
+
+  if (!rolling) {
+    if (moveDir !== 0) {
+      player2.vel.x = moveSpeed * moveDir;
+      player2.facing = moveDir;
+    } else {
+      const friction = HORIZONTAL_DAMPING * dt;
+      player2.vel.x -= player2.vel.x * friction;
+      if (Math.abs(player2.vel.x) < 2) player2.vel.x = 0;
+    }
+  } else player2.vel.x *= 0.98;
+
+  if (!inStun && !rolling && dashPressedP2 && !player2.onGround) {
+    const dir = moveDir !== 0 ? moveDir : player2.facing;
+    player2.vel.x = DASH_SPEED * dir;
+    player2.rollingUntil = now + ROLL_DURATION_MS;
+    player2.rollInvulnUntil = now + ROLL_DURATION_MS * 0.7;
+    player2.onGround = false;
+  }
+  dashPressedP2 = false;
+
+  if (!inStun && jumpPressedP2 && player2.jumpsRemaining > 0) {
+    const isDoubleJump = player2.jumpsRemaining === 1 && !player2.onGround;
+    if (isDoubleJump) {
+      player2.vel.y = player2.doubleJumpVel || DOUBLE_JUMP_VELOCITY;
+      player2.lastJumpWasDouble = true;
+    } else {
+      const timeSincePress = now - lastJumpPressAtP2;
+      const isShortHop = timeSincePress >= 0 && timeSincePress <= SHORT_HOP_MAX_MS;
+      const fj = player2.firstJumpVel || FIRST_JUMP_VELOCITY;
+      player2.vel.y = isShortHop ? fj * SHORT_HOP_MULT : fj;
+      player2.lastJumpWasDouble = false;
+    }
+    player2.onGround = false;
+    player2.jumpsRemaining -= 1;
+  }
+  jumpPressedP2 = false;
+}
+
 function handleDummyAI(now) {
-  if (roundOver || dummyMode === 0 || now < dummyNextAttackAt) return;
+  if (gameState !== GAME_STATE.PRACTICE || roundOver || dummyMode === 0 || now < dummyNextAttackAt) return;
   const dx = player.pos.x - dummy.pos.x;
   const distanceX = Math.abs(dx);
   const sameHeight = Math.abs(player.pos.y - dummy.pos.y) < 40;
@@ -76,8 +148,9 @@ function handleDummyAI(now) {
 }
 
 function handleCombat(dt, now) {
+  const opponent = getOpponent();
   const playerBox = getAABB(player);
-  const dummyBox = getAABB(dummy);
+  const opponentBox = getAABB(opponent);
 
   // Move any projectile/special hitboxes that have velocity.
   for (const hb of activeHitboxes) {
@@ -126,14 +199,18 @@ function handleCombat(dt, now) {
       victim.damage += damageToApply;
       updateHUD();
 
-      if (attacker === player && victim === dummy && !victim.blocking && !isParry && damageToApply > 0) {
+      if (attacker === player && victim === opponent && !victim.blocking && !isParry && damageToApply > 0) {
         if (now - lastComboHitTime > COMBO_RESET_MS) { currentComboCount = 1; currentComboDamage = damageToApply; }
         else { currentComboCount += 1; currentComboDamage += damageToApply; }
         lastComboHitTime = now;
         if (currentComboCount > bestComboCount) { bestComboCount = currentComboCount; bestComboDamage = currentComboDamage; }
       }
 
-      const knockbackMagnitude = (hb.base + victim.damage * hb.scaling) * knockbackMult / victim.weight;
+      let knockbackMagnitude = (hb.base + victim.damage * hb.scaling) * knockbackMult / victim.weight;
+      if (victim.damage >= 100) {
+        const vulnMult = hb.kind === "heavy" ? VULNERABILITY_AT_100_HEAVY : VULNERABILITY_AT_100_LIGHT;
+        knockbackMagnitude *= vulnMult;
+      }
       const dx = victim.pos.x - attacker.pos.x;
       const dirX = dx >= 0 ? 1 : -1;
       let dirY = typeof hb.dirY === "number" ? hb.dirY : -0.4;
@@ -144,6 +221,17 @@ function handleCombat(dt, now) {
 
       if (victim === player) {
         const diInput = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+        if (diInput !== 0) {
+          const diStrength = 0.25;
+          const diAdjust = knockbackMagnitude * diStrength * diInput;
+          const newVx = vx + diAdjust;
+          const len2 = Math.hypot(newVx, vy) || 1;
+          const scale = knockbackMagnitude / len2;
+          vx = newVx * scale;
+          vy = vy * scale;
+        }
+      } else if (victim === player2) {
+        const diInput = (keys.has(p2Keybinds.moveRight) ? 1 : 0) - (keys.has(p2Keybinds.moveLeft) ? 1 : 0);
         if (diInput !== 0) {
           const diStrength = 0.25;
           const diAdjust = knockbackMagnitude * diStrength * diInput;
@@ -180,26 +268,58 @@ function handleCombat(dt, now) {
       }
     };
 
-    if (hb.owner === "player" && rectsOverlap(hbBox, dummyBox)) applyHit(dummy, player);
-    else if (hb.owner === "dummy" && rectsOverlap(hbBox, playerBox)) applyHit(player, dummy);
+    if (hb.owner === "player" && rectsOverlap(hbBox, opponentBox)) {
+      applyHit(opponent, player);
+      activeHitboxes.splice(i, 1);
+    } else if ((hb.owner === "dummy" || hb.owner === "player2") && rectsOverlap(hbBox, playerBox)) {
+      applyHit(player, opponent);
+      activeHitboxes.splice(i, 1);
+    }
   }
 }
 
 function updateHUD() {
-  const d = Math.round(dummy.damage), p = Math.round(player.damage);
-  dummyDamageLabel.textContent = `${d}%`;
-  playerDamageLabel.textContent = `${p}%`;
-  function colorForDamage(val) {
-    if (val < 60) return "#9dffde";
-    if (val < 120) return "#ffe28a";
-    return "#ff6b6b";
+  if (gameState === GAME_STATE.VERSUS && player2) {
+    const p1 = Math.round(player.damage), p2 = Math.round(player2.damage);
+    if (dummyDamageLabel.parentNode && dummyDamageLabel.parentNode.firstChild) {
+      dummyDamageLabel.parentNode.firstChild.nodeValue = player.name + ": ";
+      playerDamageLabel.parentNode.firstChild.nodeValue = player2.name + ": ";
+    }
+    dummyDamageLabel.textContent = p1 + "%";
+    playerDamageLabel.textContent = p2 + "%";
+    function colorForDamage(val) {
+      if (val < 60) return "#9dffde";
+      if (val < 120) return "#ffe28a";
+      return "#ff6b6b";
+    }
+    dummyDamageLabel.style.color = colorForDamage(p1);
+    playerDamageLabel.style.color = colorForDamage(p2);
+  } else {
+    const d = Math.round(dummy.damage), p = Math.round(player.damage);
+    if (dummyDamageLabel.parentNode && dummyDamageLabel.parentNode.firstChild) {
+      dummyDamageLabel.parentNode.firstChild.nodeValue = "Dummy: ";
+      playerDamageLabel.parentNode.firstChild.nodeValue = "Player: ";
+    }
+    dummyDamageLabel.textContent = d + "%";
+    playerDamageLabel.textContent = p + "%";
+    function colorForDamage(val) {
+      if (val < 60) return "#9dffde";
+      if (val < 120) return "#ffe28a";
+      return "#ff6b6b";
+    }
+    dummyDamageLabel.style.color = colorForDamage(d);
+    playerDamageLabel.style.color = colorForDamage(p);
   }
-  dummyDamageLabel.style.color = colorForDamage(d);
-  playerDamageLabel.style.color = colorForDamage(p);
 }
 
-function hardReset() {
+function getOpponent() {
+  return gameState === GAME_STATE.VERSUS ? player2 : dummy;
+}
+
+function startPractice() {
+  gameState = GAME_STATE.PRACTICE;
   player = createFighter({ x: playerStart.x, y: playerStart.y, w: 40, h: 70, color: "#3da1ff" });
+  playerTypeIndex = 0;
   applyPlayerType(playerTypeIndex);
   dummy = createFighter({
     x: dummyStart.x, y: dummyStart.y, w: 40, h: 80, color: "#ff4b5c",
@@ -207,16 +327,67 @@ function hardReset() {
     firstJumpVel: FIRST_JUMP_VELOCITY * 0.9, doubleJumpVel: DOUBLE_JUMP_VELOCITY * 0.9, weight: 1.2,
   });
   dummy.isDummy = true;
+  player2 = null;
   activeHitboxes.length = 0;
   playerStocks = MAX_STOCKS;
   dummyStocks = MAX_STOCKS;
   roundOver = false;
-  roundTimeRemaining = ROUND_TIME_SEC;
   bestComboCount = 0;
   bestComboDamage = 0;
   hitEffects.length = 0;
   currentComboCount = 0;
   currentComboDamage = 0;
   updateHUD();
+}
+
+function startVersusMatch() {
+  gameState = GAME_STATE.VERSUS;
+  player = createFighter({ x: playerStart.x, y: playerStart.y, w: 40, h: 70, color: "#3da1ff" });
+  applyPlayerTypeTo(player, p1CharacterIndex);
+  player.color = COLOR_PALETTE[p1ColorIndex % COLOR_PALETTE.length];
+  player2 = createFighterForType(p2CharacterIndex, player2Start.x, player2Start.y);
+  player2.color = COLOR_PALETTE[p2ColorIndex % COLOR_PALETTE.length];
+  player2.facing = -1;
+  activeHitboxes.length = 0;
+  playerStocks = MAX_STOCKS;
+  player2Stocks = MAX_STOCKS;
+  roundOver = false;
+  bestComboCount = 0;
+  bestComboDamage = 0;
+  hitEffects.length = 0;
+  currentComboCount = 0;
+  currentComboDamage = 0;
+  updateHUD();
+}
+
+function goToTransition() {
+  gameState = GAME_STATE.TRANSITION;
+  transitionStartTime = performance.now();
+}
+
+function updateTransition(now) {
+  const elapsed = now - transitionStartTime;
+  if (elapsed >= TRANSITION_DURATION_MS) {
+    startVersusMatch();
+  }
+}
+
+function getTransitionCountdown(now) {
+  const elapsed = now - transitionStartTime;
+  if (elapsed < 1000) return 3;
+  if (elapsed < 2000) return 2;
+  if (elapsed < 3000) return 1;
+  if (elapsed < 3500) return 0;
+  return -1;
+}
+
+function goToMenu() {
+  gameState = GAME_STATE.MENU;
+  menuSelection = 0;
+}
+
+function hardReset() {
+  if (gameState === GAME_STATE.PRACTICE) startPractice();
+  else if (gameState === GAME_STATE.VERSUS) startVersusMatch();
 }
 

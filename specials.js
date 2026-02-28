@@ -3,21 +3,30 @@
 function performPlayerSpecial() {
   const now = performance.now();
   if (now < (player.nextSpecialAt || 0)) return;
-
   const isAir = !player.onGround;
   let input = "neutral";
   if (isAir) input = "air";
   else if (keys.has("KeyS")) input = "down";
   else if (keys.has("KeyA") || keys.has("KeyD")) input = "right";
+  performSpecialFor(player, "player", input, now);
+}
 
-  const archetype = player.archetype || "archer";
-  if (archetype === "archer") {
-    useArcherSpecial(input, now);
-  } else if (archetype === "bruiser") {
-    useBruiserSpecial(input, now);
-  } else if (archetype === "mage") {
-    useMageSpecial(input, now);
-  }
+function performPlayer2Special() {
+  const now = performance.now();
+  if (!player2 || now < (player2.nextSpecialAt || 0)) return;
+  const isAir = !player2.onGround;
+  let input = "neutral";
+  if (isAir) input = "air";
+  else if (keys.has(p2Keybinds.fastFall)) input = "down";
+  else if (keys.has(p2Keybinds.moveLeft) || keys.has(p2Keybinds.moveRight)) input = "right";
+  performSpecialFor(player2, "player2", input, now);
+}
+
+function performSpecialFor(fighter, owner, input, now) {
+  const archetype = fighter.archetype || "archer";
+  if (archetype === "archer") useArcherSpecial(fighter, owner, input, now);
+  else if (archetype === "bruiser") useBruiserSpecial(fighter, owner, input, now);
+  else if (archetype === "mage") useMageSpecial(fighter, owner, input, now);
 }
 
 function pushSpecialHitboxFrom(attacker, owner, now, config) {
@@ -52,228 +61,217 @@ function pushSpecialHitboxFrom(attacker, owner, now, config) {
 
 // ---------- ARCHER SPECIALS ----------
 
-function useArcherSpecial(input, now) {
-  const dir = player.facing >= 0 ? 1 : -1;
+function useArcherSpecial(fighter, owner, input, now) {
+  const dir = fighter.facing >= 0 ? 1 : -1;
 
   if (input === "air") {
-    // Rain of Arrows: short vertical spread in front of the player while airborne.
-    const baseX = player.pos.x + dir * (player.size.w * 0.5 + 30);
-    const baseY = player.pos.y - player.size.h * 0.2;
+    const baseX = fighter.pos.x + dir * (fighter.size.w * 0.5 + 30);
+    const baseY = fighter.pos.y - fighter.size.h * 0.2;
     const count = 3;
     for (let i = 0; i < count; i++) {
-      pushSpecialHitboxFrom(player, "player", now, {
+      pushSpecialHitboxFrom(fighter, owner, now, {
         w: 20,
         h: 40,
-        offsetX: baseX - player.pos.x,
-        offsetY: baseY - player.pos.y + i * 26,
+        offsetX: baseX - fighter.pos.x,
+        offsetY: baseY - fighter.pos.y + i * 26,
         kind: "light",
         base: 210,
         scaling: 1.7,
-        damage: 3,
+        damage: 5,
         dirY: 1,
         lifetimeMs: 220,
       });
     }
-    player.nextSpecialAt = now + 900;
+    fighter.nextSpecialAt = now + 900;
     return;
   }
 
   if (input === "left") {
-    // Backstep Shot: small hop backward plus quick arrow.
-    player.pos.x -= dir * 60;
-    player.prevPos.x = player.pos.x;
+    fighter.pos.x -= dir * 60;
+    fighter.prevPos.x = fighter.pos.x;
     const speed = 900;
-    pushSpecialHitboxFrom(player, "player", now, {
+    pushSpecialHitboxFrom(fighter, owner, now, {
       w: 24,
       h: 16,
-      offsetXFacing: player.size.w * 0.5 + 30,
+      offsetXFacing: fighter.size.w * 0.5 + 30,
       useFacing: true,
       kind: "light",
       base: 230,
       scaling: 1.8,
-      damage: 4,
+      damage: 6,
       dirY: 0,
       lifetimeMs: 650,
       vx: dir * speed,
       vy: 0,
     });
-    player.nextSpecialAt = now + 800;
+    fighter.nextSpecialAt = now + 800;
     return;
   }
 
   if (input === "down") {
-    // Grounded Trap: one at a time, lasts 5s. Can't place another until it expires.
     const TRAP_LIFETIME_MS = 5000;
     const hasActiveTrap = activeHitboxes.some(
-      (hb) => hb.style === "trap" && hb.owner === "player" && (now - hb.createdAt) < (hb.lifetimeMs || TRAP_LIFETIME_MS)
+      (hb) => hb.style === "trap" && hb.owner === owner && (now - hb.createdAt) < (hb.lifetimeMs || TRAP_LIFETIME_MS)
     );
     if (hasActiveTrap) {
       playSfx("blocked");
-      hitEffects.push({ type: "text", text: "!", x: player.pos.x, y: player.pos.y - 48, createdAt: now, duration: 400 });
+      hitEffects.push({ type: "text", text: "!", x: fighter.pos.x, y: fighter.pos.y - 48, createdAt: now, duration: 400 });
       return;
     }
-    pushSpecialHitboxFrom(player, "player", now, {
+    pushSpecialHitboxFrom(fighter, owner, now, {
       w: 90,
       h: 26,
-      offsetXFacing: player.size.w * 0.7,
+      offsetXFacing: fighter.size.w * 0.7,
       useFacing: true,
-      offsetY: player.size.h * 0.5 - 4,
+      offsetY: fighter.size.h * 0.5 - 4,
       kind: "light",
       base: 230,
       scaling: 1.4,
-      damage: 3,
+      damage: 5,
       dirY: -0.05,
       lifetimeMs: TRAP_LIFETIME_MS,
       style: "trap",
     });
-    player.nextSpecialAt = now + 400;
+    fighter.nextSpecialAt = now + 400;
     return;
   }
 
   if (input === "right") {
-    // Power Shot: slower, stronger arrow.
     const speed = 1050;
-    pushSpecialHitboxFrom(player, "player", now, {
+    pushSpecialHitboxFrom(fighter, owner, now, {
       w: 30,
       h: 18,
-      offsetXFacing: player.size.w * 0.5 + 38,
+      offsetXFacing: fighter.size.w * 0.5 + 38,
       useFacing: true,
       kind: "heavy",
       base: 360,
       scaling: 3.0,
-      damage: 10,
+      damage: 8,
       dirY: 0,
       lifetimeMs: 800,
       vx: dir * speed,
       vy: 0,
     });
-    player.nextSpecialAt = now + 1300;
+    fighter.nextSpecialAt = now + 1300;
     return;
   }
 
-  // Neutral quick shot.
   const speed = 900;
-  pushSpecialHitboxFrom(player, "player", now, {
+  pushSpecialHitboxFrom(fighter, owner, now, {
     w: 24,
     h: 16,
-    offsetXFacing: player.size.w * 0.5 + 26,
+    offsetXFacing: fighter.size.w * 0.5 + 26,
     useFacing: true,
     kind: "light",
     base: 220,
     scaling: 1.6,
-    damage: 4,
+    damage: 6,
     dirY: 0,
     lifetimeMs: 650,
     vx: dir * speed,
     vy: 0,
   });
-  player.nextSpecialAt = now + 500;
+  fighter.nextSpecialAt = now + 500;
 }
 
 // ---------- BRUISER SPECIALS ----------
 
-function useBruiserSpecial(input, now) {
-  const dir = player.facing >= 0 ? 1 : -1;
+function useBruiserSpecial(fighter, owner, input, now) {
+  const dir = fighter.facing >= 0 ? 1 : -1;
 
   if (input === "air") {
-    // Divebomb: strong downward slam.
-    pushSpecialHitboxFrom(player, "player", now, {
+    pushSpecialHitboxFrom(fighter, owner, now, {
       w: 60,
       h: 50,
       offsetX: 0,
-      offsetY: player.size.h * 0.5 + 20,
+      offsetY: fighter.size.h * 0.5 + 20,
       kind: "heavy",
       base: 360,
       scaling: 2.7,
-      damage: 11,
+      damage: 7,
       dirY: 1,
       lifetimeMs: 180,
     });
-    player.vel.y = Math.max(player.vel.y, 900);
-    player.nextSpecialAt = now + 1100;
+    fighter.vel.y = Math.max(fighter.vel.y, 900);
+    fighter.nextSpecialAt = now + 1100;
     return;
   }
 
   if (input === "left") {
-    // Reversal Shoulder: quick close-range hit slightly behind then in front.
-    pushSpecialHitboxFrom(player, "player", now, {
+    pushSpecialHitboxFrom(fighter, owner, now, {
       w: 70,
       h: 60,
-      offsetXFacing: player.size.w * 0.2,
+      offsetXFacing: fighter.size.w * 0.2,
       useFacing: true,
       kind: "heavy",
       base: 320,
       scaling: 2.4,
-      damage: 9,
+      damage: 7,
       dirY: -0.1,
       lifetimeMs: 160,
     });
-    player.nextSpecialAt = now + 900;
+    fighter.nextSpecialAt = now + 900;
     return;
   }
 
   if (input === "down") {
-    // Ground Slam: small quake in front.
-    pushSpecialHitboxFrom(player, "player", now, {
+    pushSpecialHitboxFrom(fighter, owner, now, {
       w: 90,
       h: 40,
-      offsetXFacing: player.size.w * 0.6,
+      offsetXFacing: fighter.size.w * 0.6,
       useFacing: true,
-      offsetY: player.size.h * 0.5 - 8,
+      offsetY: fighter.size.h * 0.5 - 8,
       kind: "heavy",
       base: 340,
       scaling: 2.2,
-      damage: 10,
+      damage: 7,
       dirY: -0.25,
       lifetimeMs: 200,
     });
-    player.nextSpecialAt = now + 1200;
+    fighter.nextSpecialAt = now + 1200;
     return;
   }
 
   if (input === "right") {
-    // Command Grab: ignores block, short-range.
-    pushSpecialHitboxFrom(player, "player", now, {
+    pushSpecialHitboxFrom(fighter, owner, now, {
       w: 65,
       h: 70,
-      offsetXFacing: player.size.w * 0.6,
+      offsetXFacing: fighter.size.w * 0.6,
       useFacing: true,
       kind: "heavy",
       base: 380,
       scaling: 2.8,
-      damage: 14,
+      damage: 8,
       dirY: -0.2,
       lifetimeMs: 120,
       ignoreBlock: true,
     });
-    player.nextSpecialAt = now + 1500;
+    fighter.nextSpecialAt = now + 1500;
     return;
   }
 
-  // Neutral Armor Jab (just a strong body blow for now).
-  pushSpecialHitboxFrom(player, "player", now, {
+  pushSpecialHitboxFrom(fighter, owner, now, {
     w: 60,
     h: 60,
-    offsetXFacing: player.size.w * 0.5,
+    offsetXFacing: fighter.size.w * 0.5,
     useFacing: true,
     kind: "heavy",
     base: 300,
     scaling: 2.3,
-    damage: 9,
+    damage: 7,
     dirY: -0.15,
     lifetimeMs: 150,
   });
-  player.nextSpecialAt = now + 800;
+  fighter.nextSpecialAt = now + 800;
 }
 
 // ---------- MAGE SPECIALS ----------
 
-function useMageSpecial(input, now) {
-  const dir = player.facing >= 0 ? 1 : -1;
+function useMageSpecial(fighter, owner, input, now) {
+  const dir = fighter.facing >= 0 ? 1 : -1;
 
   if (input === "air") {
-    // Aerial Surge: small burst around the player.
-    pushSpecialHitboxFrom(player, "player", now, {
+    pushSpecialHitboxFrom(fighter, owner, now, {
       w: 90,
       h: 90,
       offsetX: 0,
@@ -285,28 +283,26 @@ function useMageSpecial(input, now) {
       dirY: -0.1,
       lifetimeMs: 200,
     });
-    player.nextSpecialAt = now + 1000;
+    fighter.nextSpecialAt = now + 1000;
     return;
   }
 
   if (input === "left") {
-    // Blink Back: short teleport backwards with brief invuln.
     const distance = 120;
-    player.pos.x -= dir * distance;
-    player.prevPos.x = player.pos.x;
-    player.rollingUntil = now + 180;
-    player.rollInvulnUntil = now + 140;
-    player.nextSpecialAt = now + 900;
+    fighter.pos.x -= dir * distance;
+    fighter.prevPos.x = fighter.pos.x;
+    fighter.rollingUntil = now + 180;
+    fighter.rollInvulnUntil = now + 140;
+    fighter.nextSpecialAt = now + 900;
     return;
   }
 
   if (input === "down") {
-    // Rune Trap: instant small explosion at feet.
-    pushSpecialHitboxFrom(player, "player", now, {
+    pushSpecialHitboxFrom(fighter, owner, now, {
       w: 80,
       h: 40,
       offsetX: 0,
-      offsetY: player.size.h * 0.5 - 6,
+      offsetY: fighter.size.h * 0.5 - 6,
       kind: "light",
       base: 260,
       scaling: 2.0,
@@ -314,18 +310,17 @@ function useMageSpecial(input, now) {
       dirY: -0.15,
       lifetimeMs: 220,
     });
-    player.nextSpecialAt = now + 1200;
+    fighter.nextSpecialAt = now + 1200;
     return;
   }
 
   if (input === "right") {
-    // Magic Lance: mid-range fast poke.
-    pushSpecialHitboxFrom(player, "player", now, {
+    pushSpecialHitboxFrom(fighter, owner, now, {
       w: 90,
       h: 40,
-      offsetXFacing: player.size.w,
+      offsetXFacing: fighter.size.w,
       useFacing: true,
-      offsetY: -player.size.h * 0.2,
+      offsetY: -fighter.size.h * 0.2,
       kind: "light",
       base: 300,
       scaling: 2.1,
@@ -333,27 +328,26 @@ function useMageSpecial(input, now) {
       dirY: -0.2,
       lifetimeMs: 160,
     });
-    player.nextSpecialAt = now + 850;
+    fighter.nextSpecialAt = now + 850;
     return;
   }
 
-  // Neutral Orb: slow-moving projectile.
   const speed = 420;
-  pushSpecialHitboxFrom(player, "player", now, {
+  pushSpecialHitboxFrom(fighter, owner, now, {
     w: 28,
     h: 28,
-    offsetXFacing: player.size.w * 0.5 + 22,
+    offsetXFacing: fighter.size.w * 0.5 + 22,
     useFacing: true,
-    offsetY: -player.size.h * 0.3,
+    offsetY: -fighter.size.h * 0.3,
     kind: "light",
     base: 230,
     scaling: 1.4,
-    damage: 5,
+    damage: 6,
     dirY: 0,
     lifetimeMs: 1100,
     vx: dir * speed,
     vy: 0,
   });
-  player.nextSpecialAt = now + 900;
+  fighter.nextSpecialAt = now + 900;
 }
 

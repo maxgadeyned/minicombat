@@ -5,26 +5,50 @@ let lastTime = performance.now();
 function loop(now) {
   const rawDt = (now - lastTime) / 1000;
   lastTime = now;
-  let dt = Math.min(rawDt, 1 / 30);
-  if (now < koSlowmoUntil) dt *= KO_SLOWMO_SCALE;
-  if (!roundOver) {
-    handlePlayerInput(dt, now);
-    integrateFighter(player, dt);
-    integrateFighter(dummy, dt);
-    resolvePlayerDummyCollision();
-    applyBlastZoneRespawn(dummy, true);
-    applyBlastZoneRespawn(player, false);
-    handleCombat(dt, now);
-    handleDummyAI(now);
-    roundTimeRemaining -= dt;
-    if (roundTimeRemaining <= 0) {
-      roundTimeRemaining = 0;
-      roundOver = true;
+  const dt = Math.min(rawDt, 1 / 30);
+
+  if (gameState === GAME_STATE.MENU) {
+    drawMenu(now);
+    requestAnimationFrame(loop);
+    return;
+  }
+  if (gameState === GAME_STATE.VERSUS_SELECT) {
+    drawCharacterSelect(now);
+    requestAnimationFrame(loop);
+    return;
+  }
+  if (gameState === GAME_STATE.TRANSITION) {
+    updateTransition(now);
+    drawTransition(now);
+    requestAnimationFrame(loop);
+    return;
+  }
+  if (gameState === GAME_STATE.P2_SETTINGS) {
+    drawP2Settings(now);
+    requestAnimationFrame(loop);
+    return;
+  }
+
+  let dtScaled = dt;
+  if (now < koSlowmoUntil) dtScaled *= KO_SLOWMO_SCALE;
+  if (!roundOver && !gamePaused) {
+    handlePlayerInput(dtScaled, now);
+    integrateFighter(player, dtScaled);
+    if (gameState === GAME_STATE.VERSUS && player2) {
+      handlePlayer2Input(dtScaled, now);
+      integrateFighter(player2, dtScaled);
+      applyBlastZoneRespawn(player2, false);
+    } else {
+      integrateFighter(dummy, dtScaled);
+      applyBlastZoneRespawn(dummy, true);
+      handleDummyAI(now);
     }
+    resolvePlayerDummyCollision();
+    applyBlastZoneRespawn(player, false);
+    handleCombat(dtScaled, now);
   }
   draw(now);
   requestAnimationFrame(loop);
 }
 
-updateHUD();
 requestAnimationFrame(loop);

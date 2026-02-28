@@ -2,6 +2,161 @@
 
 function clear() { ctx.clearRect(0, 0, WORLD.width, WORLD.height); }
 
+function drawMenu() {
+  clear();
+  ctx.save();
+  const grad = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+  grad.addColorStop(0, "#1a1a2e");
+  grad.addColorStop(1, "#16213e");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = "bold 48px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("MINIATURE COMBAT", WORLD.width / 2, WORLD.height * 0.32);
+  ctx.font = "22px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillText("Choose mode", WORLD.width / 2, WORLD.height * 0.45);
+  const options = ["Practice (vs Dummy)", "Local 2P Versus", "P2 Controls"];
+  const y = WORLD.height * 0.52;
+  const lineHeight = 48;
+  for (let i = 0; i < options.length; i++) {
+    const isSel = i === menuSelection;
+    ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.5)";
+    ctx.font = isSel ? "bold 28px system-ui" : "24px system-ui";
+    ctx.fillText(options[i], WORLD.width / 2, y + i * lineHeight);
+  }
+  ctx.font = "14px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.fillText("↑↓ Select  •  Enter / Space Confirm  •  Esc Back", WORLD.width / 2, WORLD.height * 0.78);
+  ctx.restore();
+}
+
+function drawP2Settings() {
+  clear();
+  ctx.save();
+  const grad = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+  grad.addColorStop(0, "#1a1a2e");
+  grad.addColorStop(1, "#16213e");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = "bold 36px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("PLAYER 2 CONTROLS", WORLD.width / 2, 50);
+  ctx.font = "14px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.fillText("↑↓ Select  •  Enter to rebind  •  R reset to defaults  •  Esc back", WORLD.width / 2, 82);
+  const startY = 130;
+  const lineH = 42;
+  for (let i = 0; i < P2_SETTINGS_ACTIONS.length; i++) {
+    const action = P2_SETTINGS_ACTIONS[i];
+    const label = P2_SETTINGS_LABELS[i];
+    const code = p2Keybinds[action];
+    const disp = codeToDisplay(code);
+    const isSel = i === p2SettingsSelection;
+    const isRebinding = i === p2RebindingAction;
+    ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.8)";
+    ctx.font = isSel ? "bold 18px system-ui" : "16px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText(label, WORLD.width * 0.35, startY + i * lineH);
+    ctx.textAlign = "right";
+    ctx.fillStyle = isRebinding ? "#ffb347" : "rgba(255,255,255,0.7)";
+    ctx.fillText(isRebinding ? "Press any key..." : disp, WORLD.width * 0.65, startY + i * lineH);
+  }
+  ctx.restore();
+}
+
+function drawCharacterSelect() {
+  clear();
+  ctx.save();
+  const grad = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+  grad.addColorStop(0, "#1a1a2e");
+  grad.addColorStop(1, "#16213e");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.font = "bold 36px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("CHARACTER SELECT", WORLD.width / 2, 50);
+  ctx.font = "16px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillText("P1: 1 2 3  •  P2: Y U I  •  P1 color: Q E  •  P2 color: 7 9  •  Enter to start  •  Esc back", WORLD.width / 2, 88);
+  const names = PLAYER_TYPES.map((t) => t.label);
+  const p1Color = COLOR_PALETTE[p1ColorIndex % COLOR_PALETTE.length];
+  const p2Color = COLOR_PALETTE[p2ColorIndex % COLOR_PALETTE.length];
+  const p1x = WORLD.width * 0.28;
+  const p2x = WORLD.width * 0.72;
+  const boxY = 140;
+  const boxW = 110;
+  const boxH = 140;
+  const gap = 16;
+  const totalW = 3 * boxW + 2 * gap;
+  for (let i = 0; i < 3; i++) {
+    const x1 = p1x - totalW / 2 + i * (boxW + gap);
+    const x2 = p2x - totalW / 2 + i * (boxW + gap);
+    const isP1 = i === p1CharacterIndex;
+    const isP2 = i === p2CharacterIndex;
+    ctx.strokeStyle = isP1 ? "#6bffb5" : "rgba(255,255,255,0.2)";
+    ctx.lineWidth = isP1 ? 4 : 2;
+    ctx.strokeRect(x1, boxY, boxW, boxH);
+    ctx.fillStyle = (isP1 ? p1Color : PLAYER_TYPES[i].color) + "50";
+    ctx.fillRect(x1, boxY, boxW, boxH);
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.font = "bold 15px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(names[i], x1 + boxW / 2, boxY + boxH / 2 - 6);
+    ctx.strokeStyle = isP2 ? "#ffb347" : "rgba(255,255,255,0.2)";
+    ctx.lineWidth = isP2 ? 4 : 2;
+    ctx.strokeRect(x2, boxY, boxW, boxH);
+    ctx.fillStyle = (isP2 ? p2Color : PLAYER_TYPES[i].color) + "50";
+    ctx.fillRect(x2, boxY, boxW, boxH);
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.fillText(names[i], x2 + boxW / 2, boxY + boxH / 2 - 6);
+  }
+  ctx.fillStyle = "#6bffb5";
+  ctx.font = "bold 18px system-ui";
+  ctx.fillText("Player 1", p1x, 118);
+  ctx.fillStyle = p1Color;
+  ctx.fillRect(p1x + 52, 114, 18, 14);
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(p1x + 52, 114, 18, 14);
+  ctx.fillStyle = "#ffb347";
+  ctx.fillText("Player 2", p2x, 118);
+  ctx.fillStyle = p2Color;
+  ctx.fillRect(p2x + 52, 114, 18, 14);
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(p2x + 52, 114, 18, 14);
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.font = "14px system-ui";
+  ctx.fillText(PLAYER_TYPES[p1CharacterIndex].label, p1x, boxY + boxH + 28);
+  ctx.fillText(PLAYER_TYPES[p2CharacterIndex].label, p2x, boxY + boxH + 28);
+  ctx.restore();
+}
+
+function drawTransition(now) {
+  clear();
+  ctx.save();
+  const grad = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+  grad.addColorStop(0, "#0f0f1a");
+  grad.addColorStop(1, "#1a1a2e");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  ctx.textAlign = "center";
+  const countdown = getTransitionCountdown(now);
+  let text = "";
+  if (countdown === 0) text = "GO!";
+  else if (countdown > 0) text = String(countdown);
+  if (text) {
+    ctx.fillStyle = countdown === 0 ? "#6bffb5" : "rgba(255,255,255,0.9)";
+    ctx.font = "bold 120px system-ui";
+    ctx.fillText(text, WORLD.width / 2, WORLD.height / 2 + 40);
+  }
+  ctx.restore();
+}
+
 function drawPlatform() {
   const gradient = ctx.createLinearGradient(PLATFORM.x, PLATFORM.y, PLATFORM.x, PLATFORM.y + PLATFORM.height);
   gradient.addColorStop(0, "#3d3d4f");
@@ -15,7 +170,7 @@ function drawPlatform() {
 function drawEntity(fighter) {
   const aabb = getAABB(fighter);
   ctx.save();
-  if (fighter === player && fighter.rollInvulnUntil && performance.now() < fighter.rollInvulnUntil) ctx.globalAlpha = 0.4;
+  if ((fighter === player || fighter === player2) && fighter.rollInvulnUntil && performance.now() < fighter.rollInvulnUntil) ctx.globalAlpha = 0.4;
   if (fighter.parryFlashUntil && performance.now() < fighter.parryFlashUntil) {
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = "#fff";
@@ -67,8 +222,8 @@ function drawEffects(now) {
     } else if (effect.type === "text") {
       ctx.save();
       ctx.globalAlpha = 1 - t;
-      ctx.fillStyle = "#adff2f";
-      ctx.font = "bold 22px system-ui";
+      ctx.fillStyle = effect.text === "!" ? "#ff6b6b" : "#adff2f";
+      ctx.font = effect.text === "!" ? "bold 28px system-ui" : "bold 22px system-ui";
       ctx.textAlign = "center";
       ctx.fillText(effect.text, effect.x, effect.y - 10 * (1 - t));
       ctx.restore();
@@ -118,7 +273,8 @@ function draw(now) {
   ctx.fillRect(0, horizonY, WORLD.width, WORLD.height - horizonY);
   drawPlatform();
   drawEntity(player);
-  drawEntity(dummy);
+  if (gameState === GAME_STATE.VERSUS && player2) drawEntity(player2);
+  else drawEntity(dummy);
   drawHitboxes(now);
   drawEffects(now);
   ctx.restore();
@@ -135,34 +291,70 @@ function draw(now) {
   ctx.font = "12px system-ui";
   ctx.textAlign = "left";
   const playerState = now < player.stunnedUntil ? "HITSTUN" : now < player.rollingUntil ? "ROLL" : player.blocking ? "BLOCK" : player.onGround ? "GROUND" : "AIR";
-  ctx.fillText(`P%: ${Math.round(player.damage)}  Stocks: ${playerStocks}  State: ${playerState}`, 12, 20);
-  ctx.fillText(`D%: ${Math.round(dummy.damage)}  Stocks: ${dummyStocks}  Dummy: ${dummy.onGround ? "GROUND" : "AIR"}`, 12, 36);
-  ctx.fillText(`Dummy Mode (T): ${DUMMY_MODE_LABELS[dummyMode]}`, 12, 52);
-  ctx.textAlign = "center";
-  ctx.fillText(`${Math.ceil(Math.max(0, roundTimeRemaining))}`, WORLD.width / 2, 22);
+  if (gameState === GAME_STATE.VERSUS && player2) {
+    ctx.fillText(`P1 ${player.name}: ${Math.round(player.damage)}%  Stocks: ${playerStocks}  ${playerState}`, 12, 20);
+    const p2State = now < player2.stunnedUntil ? "HITSTUN" : now < player2.rollingUntil ? "ROLL" : player2.blocking ? "BLOCK" : player2.onGround ? "GROUND" : "AIR";
+    ctx.fillText(`P2 ${player2.name}: ${Math.round(player2.damage)}%  Stocks: ${player2Stocks}  ${p2State}`, 12, 36);
+  } else {
+    ctx.fillText(`P%: ${Math.round(player.damage)}  Stocks: ${playerStocks}  State: ${playerState}`, 12, 20);
+    ctx.fillText(`D%: ${Math.round(dummy.damage)}  Stocks: ${dummyStocks}  Dummy: ${dummy.onGround ? "GROUND" : "AIR"}`, 12, 36);
+    ctx.fillText(`Dummy Mode (T): ${DUMMY_MODE_LABELS[dummyMode]}`, 12, 52);
+  }
   ctx.textAlign = "left";
   if (currentComboCount > 1 && now - lastComboHitTime <= COMBO_RESET_MS) {
     ctx.textAlign = "right";
     ctx.font = "bold 14px system-ui";
     ctx.fillText(`${currentComboCount} HIT  /  ${Math.round(currentComboDamage)}%`, WORLD.width - 16, 24);
   }
+  if (gamePaused) {
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+    ctx.textAlign = "center";
+    ctx.font = "bold 36px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.fillText("PAUSED", WORLD.width / 2, WORLD.height / 2 - 50);
+    const opts = ["Resume", "Exit to menu"];
+    for (let i = 0; i < opts.length; i++) {
+      const isSel = i === pauseMenuSelection;
+      ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.6)";
+      ctx.font = isSel ? "bold 22px system-ui" : "20px system-ui";
+      ctx.fillText(opts[i], WORLD.width / 2, WORLD.height / 2 + 10 + i * 40);
+    }
+    ctx.font = "13px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.fillText("↑↓ Select  •  Enter / Space  •  Esc = Resume", WORLD.width / 2, WORLD.height / 2 + 110);
+  }
   if (roundOver) {
     ctx.textAlign = "center";
     ctx.font = "bold 32px system-ui";
     let winnerText = "ROUND OVER";
-    if (roundTimeRemaining <= 0) {
-      if (playerStocks > dummyStocks) winnerText = player.name + " WINS (TIME)";
-      else if (dummyStocks > playerStocks) winnerText = "DUMMY WINS (TIME)";
-      else winnerText = (player.damage <= dummy.damage ? player.name : "DUMMY") + " WINS (LOWER %)";
+    if (gameState === GAME_STATE.VERSUS && player2) {
+      if (playerStocks > 0 && player2Stocks <= 0) winnerText = "P1 " + player.name + " WINS";
+      else if (player2Stocks > 0 && playerStocks <= 0) winnerText = "P2 " + player2.name + " WINS";
     } else {
       if (playerStocks > 0 && dummyStocks <= 0) winnerText = player.name + " WINS";
       else if (dummyStocks > 0 && playerStocks <= 0) winnerText = "DUMMY WINS";
     }
     ctx.fillText(winnerText, WORLD.width / 2, WORLD.height / 2 - 36);
-    ctx.font = "14px system-ui";
-    ctx.fillText(`Best combo: ${bestComboCount} hit / ${Math.round(bestComboDamage)}%`, WORLD.width / 2, WORLD.height / 2 + 2);
-    ctx.font = "16px system-ui";
-    ctx.fillText("Press R to reset", WORLD.width / 2, WORLD.height / 2 + 28);
+    if (gameState === GAME_STATE.PRACTICE) {
+      ctx.font = "14px system-ui";
+      ctx.fillText(`Best combo: ${bestComboCount} hit / ${Math.round(bestComboDamage)}%`, WORLD.width / 2, WORLD.height / 2 + 2);
+      ctx.font = "16px system-ui";
+      ctx.fillText("Press R to reset", WORLD.width / 2, WORLD.height / 2 + 28);
+    } else if (gameState === GAME_STATE.VERSUS && player2) {
+      const opts = ["Restart", "Change characters", "Exit to menu"];
+      const startY = WORLD.height / 2 + 8;
+      const lineH = 36;
+      for (let i = 0; i < opts.length; i++) {
+        const isSel = i === roundOverSelection;
+        ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.6)";
+        ctx.font = isSel ? "bold 20px system-ui" : "18px system-ui";
+        ctx.fillText(opts[i], WORLD.width / 2, startY + i * lineH);
+      }
+      ctx.font = "13px system-ui";
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.fillText("↑↓ Select  •  Enter / Space confirm  •  R = Restart", WORLD.width / 2, WORLD.height / 2 + 130);
+    }
   }
   ctx.restore();
 }

@@ -22,7 +22,9 @@ const BLAST_MARGIN = 200;
 
 const ATTACK_LIFETIME_MS = 100;
 const LIGHT = { base: 260, scaling: 2.0, damage: 5 };
-const HEAVY = { base: 380, scaling: 3.0, damage: 12 };
+const HEAVY = { base: 380, scaling: 3.0, damage: 6 };
+const VULNERABILITY_AT_100_LIGHT = 1.5;
+const VULNERABILITY_AT_100_HEAVY = 2.8;
 
 const BLOCK_DAMAGE_MULT = 0.35;
 const BLOCK_KNOCKBACK_MULT = 0.45;

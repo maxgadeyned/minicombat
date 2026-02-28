@@ -13,7 +13,8 @@ function integrateFighter(fighter, dt) {
 
   fighter.prevPos.x = fighter.pos.x;
   fighter.prevPos.y = fighter.pos.y;
-  const gravityMult = !fighter.onGround && keys.has("KeyS") ? FAST_FALL_MULTIPLIER : 1;
+  const fastFall = fighter.onGround ? false : (fighter === player2 ? keys.has(p2Keybinds.fastFall) : keys.has("KeyS"));
+  const gravityMult = fastFall ? FAST_FALL_MULTIPLIER : 1;
   fighter.vel.y += GRAVITY * gravityMult * dt;
   fighter.pos.x += fighter.vel.x * dt;
   fighter.pos.y += fighter.vel.y * dt;
@@ -34,7 +35,7 @@ function integrateFighter(fighter, dt) {
     fighter.onGround = true;
     fighter.jumpsRemaining = 2;
     fighter.lastJumpWasDouble = false;
-    if (fighter === player && prevBottom < plat.y) {
+    if ((fighter === player || fighter === player2) && prevBottom < plat.y) {
       playSfx("land");
       hitEffects.push({ type: "dust", x: fighter.pos.x, y: PLATFORM.y, createdAt: performance.now(), duration: 220 });
     }
@@ -67,9 +68,17 @@ function applyBlastZoneRespawn(fighter, isDummy) {
     shakeUntil = Math.max(shakeUntil, nowMs + 280);
     shakeMagnitude = Math.max(shakeMagnitude, SHAKE_HEAVY * 1.25);
   }
-  if (isDummy) {
+  if (fighter === player2) {
+    player2Stocks = Math.max(0, player2Stocks - 1);
+    if (player2Stocks <= 0) { roundOver = true; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
+    fighter.pos.x = player2Start.x; fighter.pos.y = player2Start.y;
+    fighter.prevPos.x = player2Start.x; fighter.prevPos.y = player2Start.y;
+    fighter.vel.x = 0; fighter.vel.y = 0; fighter.damage = 0;
+    fighter.jumpsRemaining = 2; fighter.lastJumpWasDouble = false;
+    updateHUD();
+  } else if (isDummy) {
     dummyStocks = Math.max(0, dummyStocks - 1);
-    if (dummyStocks <= 0) roundOver = true;
+    if (dummyStocks <= 0) { roundOver = true; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
     fighter.pos.x = dummyStart.x; fighter.pos.y = dummyStart.y;
     fighter.prevPos.x = dummyStart.x; fighter.prevPos.y = dummyStart.y;
     fighter.vel.x = 0; fighter.vel.y = 0; fighter.damage = 0;
@@ -77,7 +86,7 @@ function applyBlastZoneRespawn(fighter, isDummy) {
     updateHUD();
   } else {
     playerStocks = Math.max(0, playerStocks - 1);
-    if (playerStocks <= 0) roundOver = true;
+    if (playerStocks <= 0) { roundOver = true; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
     fighter.pos.x = playerStart.x; fighter.pos.y = playerStart.y;
     fighter.prevPos.x = playerStart.x; fighter.prevPos.y = playerStart.y;
     fighter.vel.x = 0; fighter.vel.y = 0; fighter.jumpsRemaining = 2; fighter.damage = 0;
@@ -87,15 +96,28 @@ function applyBlastZoneRespawn(fighter, isDummy) {
 }
 
 function resolvePlayerDummyCollision() {
-  const a = getAABB(player), b = getAABB(dummy);
+  const opponent = gameState === GAME_STATE.VERSUS ? player2 : dummy;
+  const a = getAABB(player), b = getAABB(opponent);
   const overlapX = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
   const overlapY = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
   if (overlapX > 0 && overlapY > 0) {
     const push = overlapX;
-    if (player.pos.x < dummy.pos.x) { player.pos.x -= push * 0.9; dummy.pos.x += push * 0.1; }
-    else { player.pos.x += push * 0.9; dummy.pos.x -= push * 0.1; }
-    dummy.vel.x += player.vel.x * 0.1;
+    if (player.pos.x < opponent.pos.x) { player.pos.x -= push * 0.9; opponent.pos.x += push * 0.1; }
+    else { player.pos.x += push * 0.9; opponent.pos.x -= push * 0.1; }
+    opponent.vel.x += player.vel.x * 0.1;
     player.vel.x *= 0.6;
+  }
+  if (gameState === GAME_STATE.VERSUS && player2) {
+    const a2 = getAABB(player2), b2 = getAABB(player);
+    const overlapX2 = Math.min(a2.x + a2.w, b2.x + b2.w) - Math.max(a2.x, b2.x);
+    const overlapY2 = Math.min(a2.y + a2.h, b2.y + b2.h) - Math.max(a2.y, b2.y);
+    if (overlapX2 > 0 && overlapY2 > 0) {
+      const push2 = overlapX2;
+      if (player2.pos.x < player.pos.x) { player2.pos.x -= push2 * 0.9; player.pos.x += push2 * 0.1; }
+      else { player2.pos.x += push2 * 0.9; player.pos.x -= push2 * 0.1; }
+      player.vel.x += player2.vel.x * 0.1;
+      player2.vel.x *= 0.6;
+    }
   }
 }
 
