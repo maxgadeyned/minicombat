@@ -42,8 +42,8 @@ window.addEventListener("keydown", (e) => {
       startTransition(GAME_STATE.MENU);
       return;
     }
-    if (e.code === "ArrowDown") { settingsSelection = (settingsSelection + 1) % 3; return; }
-    if (e.code === "ArrowUp") { settingsSelection = (settingsSelection - 1 + 3) % 3; return; }
+    if (e.code === "ArrowDown") { settingsSelection = (settingsSelection + 1) % 4; return; }
+    if (e.code === "ArrowUp") { settingsSelection = (settingsSelection - 1 + 4) % 4; return; }
     if (e.code === "ArrowLeft") {
       if (settingsSelection === 1) { setMusicVolume(Math.max(0, musicVolume - 10)); return; }
       if (settingsSelection === 2) { setEffectsVolume(Math.max(0, effectsVolume - 10)); return; }
@@ -58,7 +58,17 @@ window.addEventListener("keydown", (e) => {
         p2SettingsSelection = 0;
         p2RebindingAction = null;
         p2SettingsFromSettings = true;
+      } else if (settingsSelection === 3) {
+        startTransition(GAME_STATE.CREDITS);
       }
+    }
+    return;
+  }
+
+  if (gameState === GAME_STATE.CREDITS) {
+    if (e.code === "Escape" || e.code === "Backspace" || e.code === "Enter" || e.code === "Space") {
+      startTransition(GAME_STATE.SETTINGS);
+      return;
     }
     return;
   }
@@ -102,6 +112,9 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "KeyE") p1ColorIndex = (p1ColorIndex + 1) % COLOR_PALETTE.length;
     if (e.code === "Digit7") p2ColorIndex = (p2ColorIndex - 1 + COLOR_PALETTE.length) % COLOR_PALETTE.length;
     if (e.code === "Digit9") p2ColorIndex = (p2ColorIndex + 1) % COLOR_PALETTE.length;
+    if (e.code === "Digit4") stageIndex = 0;
+    if (e.code === "Digit5") stageIndex = 1;
+    if (e.code === "Digit6") stageIndex = 2;
     if (e.code === "Enter" || e.code === "Space") goToTransition();
     return;
   }

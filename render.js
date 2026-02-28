@@ -191,7 +191,7 @@ function drawSettings(now) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
   ctx.fillStyle = "rgba(0,0,0,0.25)";
-  fillRoundedRect(WORLD.width * 0.15, 100, WORLD.width * 0.7, 220, 16);
+  fillRoundedRect(WORLD.width * 0.15, 100, WORLD.width * 0.7, 268, 16);
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.font = "bold 34px system-ui";
   ctx.textAlign = "center";
@@ -206,6 +206,7 @@ function drawSettings(now) {
     { label: "P2 Controls", value: "Rebind keys" },
     { label: "Music Volume", value: musicVolume + "%" },
     { label: "Effects Volume", value: effectsVolume + "%" },
+    { label: "Credits", value: "" },
   ];
   for (let i = 0; i < items.length; i++) {
     const isSel = i === settingsSelection;
@@ -218,7 +219,7 @@ function drawSettings(now) {
     ctx.textAlign = "right";
     ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.7)";
     ctx.fillText(items[i].value, WORLD.width * 0.65, startY + i * lineH);
-    if (i > 0) {
+    if (i > 0 && i < 3) {
       const barW = 200;
       const barX = WORLD.width / 2 - barW / 2;
       const barY = startY + i * lineH + 10;
@@ -230,6 +231,32 @@ function drawSettings(now) {
     }
     ctx.globalAlpha = 1;
   }
+  ctx.restore();
+}
+
+function drawCredits(now) {
+  clear();
+  ctx.save();
+  const grad = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+  grad.addColorStop(0, "#1a1a2e");
+  grad.addColorStop(1, "#16213e");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  fillRoundedRect(WORLD.width * 0.2, WORLD.height * 0.25, WORLD.width * 0.6, 220, 16);
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = "bold 36px system-ui";
+  ctx.textAlign = "center";
+  drawTextWithShadow("CREDITS", WORLD.width / 2, WORLD.height * 0.38, "rgba(255,255,255,0.98)", "rgba(0,0,0,0.4)", 6);
+  ctx.font = "24px system-ui";
+  ctx.fillStyle = "#6bffb5";
+  ctx.fillText("Made by Maximiliaan Gadeyne", WORLD.width / 2, WORLD.height * 0.5);
+  ctx.font = "20px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.fillText("Thanks for playing!", WORLD.width / 2, WORLD.height * 0.58);
+  ctx.font = "14px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.fillText("Esc or Enter to back", WORLD.width / 2, WORLD.height * 0.72);
   ctx.restore();
 }
 
@@ -291,7 +318,10 @@ function drawCharacterSelect(now) {
   drawTextWithShadow("CHARACTER SELECT", WORLD.width / 2, 52, "rgba(255,255,255,0.98)", "rgba(0,0,0,0.4)", 6);
   ctx.font = "15px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText("P1: 1 2 3  •  P2: Y U I  •  P1 color: Q E  •  P2 color: 7 9  •  Enter to start  •  Esc back", WORLD.width / 2, 88);
+  ctx.fillText("P1: 1 2 3  •  P2: Y U I  •  P1 color: Q E  •  P2 color: 7 9  •  Stage: 4 5 6  •  Enter / Esc", WORLD.width / 2, 88);
+  ctx.font = "14px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.fillText("Stage: " + STAGE_NAMES[stageIndex], WORLD.width / 2, 118);
   const names = PLAYER_TYPES.map((t) => t.label);
   const p1Color = COLOR_PALETTE[p1ColorIndex % COLOR_PALETTE.length];
   const p2Color = COLOR_PALETTE[p2ColorIndex % COLOR_PALETTE.length];
@@ -549,6 +579,43 @@ function drawEffects(now) {
   for (const e of remaining) hitEffects.push(e);
 }
 
+function drawStageBackground() {
+  const horizonY = WORLD.height * 0.55;
+  const s = stageIndex % 3;
+  if (s === 0) {
+    const grad = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+    grad.addColorStop(0, "#4a6fa5");
+    grad.addColorStop(0.4, "#6b8cbe");
+    grad.addColorStop(0.7, "#3d5a80");
+    grad.addColorStop(1, "#1a1a2e");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  } else if (s === 1) {
+    const grad = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+    grad.addColorStop(0, "#ff7b54");
+    grad.addColorStop(0.3, "#ff9f6b");
+    grad.addColorStop(0.6, "#c44569");
+    grad.addColorStop(0.85, "#2d132c");
+    grad.addColorStop(1, "#1a0a1a");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+    grad.addColorStop(0, "#0d1b2a");
+    grad.addColorStop(0.35, "#1b263b");
+    grad.addColorStop(0.65, "#415a77");
+    grad.addColorStop(0.9, "#1a1a2e");
+    grad.addColorStop(1, "#0f0f1a");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  }
+  const fade = ctx.createLinearGradient(0, horizonY, 0, WORLD.height);
+  fade.addColorStop(0, "rgba(0,0,0,0)");
+  fade.addColorStop(1, "rgba(0,0,0,0.6)");
+  ctx.fillStyle = fade;
+  ctx.fillRect(0, horizonY, WORLD.width, WORLD.height - horizonY);
+}
+
 function draw(now) {
   clear();
   ctx.save();
@@ -557,12 +624,7 @@ function draw(now) {
     const oy = (Math.random() * 2 - 1) * shakeMagnitude;
     ctx.translate(ox, oy);
   }
-  const horizonY = WORLD.height * 0.55;
-  const grad = ctx.createLinearGradient(0, horizonY, 0, WORLD.height);
-  grad.addColorStop(0, "rgba(0,0,0,0)");
-  grad.addColorStop(1, "rgba(0,0,0,0.8)");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, horizonY, WORLD.width, WORLD.height - horizonY);
+  drawStageBackground();
   drawPlatform();
   drawEntity(player, now);
   if (gameState === GAME_STATE.VERSUS && player2) drawEntity(player2, now);

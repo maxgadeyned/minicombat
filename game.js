@@ -1,6 +1,6 @@
 "use strict";
 
-const GAME_STATE = { TITLE: "title", MENU: "menu", PRACTICE: "practice", VERSUS_SELECT: "versus_select", TRANSITION: "transition", VERSUS: "versus", P2_SETTINGS: "p2_settings", SETTINGS: "settings" };
+const GAME_STATE = { TITLE: "title", MENU: "menu", PRACTICE: "practice", VERSUS_SELECT: "versus_select", TRANSITION: "transition", VERSUS: "versus", P2_SETTINGS: "p2_settings", SETTINGS: "settings", CREDITS: "credits" };
 let gameState = GAME_STATE.TITLE;
 let screenEnterTime = 0;
 let transitionActive = false;
@@ -48,6 +48,8 @@ const P2_SETTINGS_ACTIONS = ["moveLeft", "moveRight", "jump", "fastFall", "dash"
 const P2_SETTINGS_LABELS = ["Move Left", "Move Right", "Jump", "Fast Fall", "Dash", "Special", "Heavy", "Block"];
 let p1CharacterIndex = 0, p2CharacterIndex = 0;
 let p1ColorIndex = 0, p2ColorIndex = 0;
+let stageIndex = 0;
+const STAGE_NAMES = ["Arena", "Sunset", "Night"];
 let transitionStartTime = 0;
 const TRANSITION_DURATION_MS = 3500;
 
@@ -129,6 +131,7 @@ function handlePlayerInput(dt, now) {
     }
     player.onGround = false;
     player.jumpsRemaining -= 1;
+    playSfx("jump");
   }
   jumpPressed = false;
 }
@@ -187,6 +190,7 @@ function handlePlayer2Input(dt, now) {
     }
     player2.onGround = false;
     player2.jumpsRemaining -= 1;
+    playSfx("jump");
   }
   jumpPressedP2 = false;
 }
@@ -394,6 +398,7 @@ function updateTutorial(now) {
 function startPractice() {
   gameState = GAME_STATE.PRACTICE;
   tutorialMode = false;
+  stageIndex = Math.floor(Math.random() * 3);
   _initPractice();
 }
 
