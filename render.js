@@ -2,6 +2,48 @@
 
 function clear() { ctx.clearRect(0, 0, WORLD.width, WORLD.height); }
 
+function drawTransitionOverlay() {
+  const alpha = getTransitionOverlayAlpha();
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0," + alpha + ")";
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  ctx.restore();
+}
+
+function roundRectPath(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function fillRoundedRect(x, y, w, h, r) {
+  roundRectPath(x, y, w, h, r);
+  ctx.fill();
+}
+
+function drawTextWithShadow(text, x, y, fill, shadowColor, shadowBlur) {
+  ctx.shadowColor = shadowColor || "rgba(0,0,0,0.8)";
+  ctx.shadowBlur = shadowBlur != null ? shadowBlur : 8;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 2;
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+}
+
 function drawCharacterPortrait(archetype, color, x, y, size) {
   ctx.save();
   ctx.translate(x, y);
@@ -10,16 +52,28 @@ function drawCharacterPortrait(archetype, color, x, y, size) {
   ctx.strokeStyle = "rgba(255,255,255,0.4)";
   ctx.lineWidth = 2;
   if (archetype === "archer") {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(2, s * 0.08);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.beginPath();
-    ctx.arc(0, -s * 0.1, s * 0.35, 0, Math.PI * 2);
+    ctx.moveTo(-s * 0.45, s * 0.15);
+    ctx.lineTo(s * 0.45, -s * 0.15);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(s * 0.45, -s * 0.15);
+    ctx.lineTo(s * 0.25, -s * 0.05);
+    ctx.lineTo(s * 0.35, -s * 0.15);
+    ctx.lineTo(s * 0.25, -s * 0.25);
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(-s * 0.5, s * 0.2, s * 0.15, 0, Math.PI * 2);
-    ctx.moveTo(-s * 0.35, s * 0.1);
-    ctx.quadraticCurveTo(-s * 0.1, -s * 0.2, s * 0.4, s * 0.1);
+    ctx.moveTo(-s * 0.45, s * 0.15);
+    ctx.lineTo(-s * 0.35, s * 0.08);
+    ctx.lineTo(-s * 0.35, s * 0.22);
+    ctx.closePath();
+    ctx.fill();
     ctx.stroke();
   } else if (archetype === "bruiser") {
     ctx.beginPath();
@@ -52,53 +106,154 @@ function drawCharacterPortrait(archetype, color, x, y, size) {
   ctx.restore();
 }
 
-function drawMenu() {
+function drawTitleScreen(now) {
   clear();
   ctx.save();
-  const grad = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+  const t = now * 0.0003;
+  const grad = ctx.createLinearGradient(0, 0, WORLD.width * (0.5 + 0.1 * Math.sin(t)), WORLD.height);
   grad.addColorStop(0, "#1a1a2e");
-  grad.addColorStop(1, "#16213e");
+  grad.addColorStop(0.5, "#16213e");
+  grad.addColorStop(1, "#0f3460");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
-  ctx.fillStyle = "rgba(255,255,255,0.95)";
-  ctx.font = "bold 48px system-ui";
+  const titleY = WORLD.height * 0.38 + 4 * Math.sin(now * 0.002);
+  ctx.font = "bold 52px system-ui";
   ctx.textAlign = "center";
-  ctx.fillText("MINIATURE COMBAT", WORLD.width / 2, WORLD.height * 0.32);
-  ctx.font = "22px system-ui";
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillText("Choose mode", WORLD.width / 2, WORLD.height * 0.45);
-  const options = ["Local 2P Versus", "Practice (vs Dummy)", "Tutorial", "P2 Controls"];
-  const y = WORLD.height * 0.52;
-  const lineHeight = 48;
+  drawTextWithShadow("MINIATURE COMBAT", WORLD.width / 2, titleY, "rgba(255,255,255,0.98)", "rgba(0,0,0,0.6)", 12);
+  ctx.font = "20px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  const blink = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(now * 0.004));
+  ctx.globalAlpha = blink;
+  ctx.fillText("Press any key to start", WORLD.width / 2, WORLD.height * 0.55);
+  ctx.restore();
+}
+
+function drawMenu(now) {
+  clear();
+  ctx.save();
+  const elapsed = now - (screenEnterTime || now);
+  const t = now * 0.00025;
+  const grad = ctx.createLinearGradient(WORLD.width * 0.2 * Math.sin(t), 0, WORLD.width, WORLD.height);
+  grad.addColorStop(0, "#1a1a2e");
+  grad.addColorStop(0.6, "#16213e");
+  grad.addColorStop(1, "#0f3460");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  fillRoundedRect(WORLD.width * 0.2, WORLD.height * 0.22, WORLD.width * 0.6, 120, 12);
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = "bold 44px system-ui";
+  ctx.textAlign = "center";
+  drawTextWithShadow("MINIATURE COMBAT", WORLD.width / 2, WORLD.height * 0.32, "rgba(255,255,255,0.98)", "rgba(0,0,0,0.5)", 6);
+  ctx.font = "20px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.fillText("Choose mode", WORLD.width / 2, WORLD.height * 0.42);
+  const options = ["Local 2P Versus", "Practice (vs Dummy)", "Tutorial", "Settings"];
+  const y = WORLD.height * 0.5;
+  const lineHeight = 50;
+  const pulse = 1 + 0.03 * Math.sin(now * 0.008);
+  const cx = WORLD.width / 2;
   for (let i = 0; i < options.length; i++) {
     const isSel = i === menuSelection;
-    ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.5)";
-    ctx.font = isSel ? "bold 28px system-ui" : "24px system-ui";
-    ctx.fillText(options[i], WORLD.width / 2, y + i * lineHeight);
+    const delay = i * 70;
+    const anim = Math.min(1, (elapsed - delay) / 180);
+    const slideX = (1 - anim) * -50;
+    const alpha = 0.35 + 0.65 * anim;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(slideX, 0);
+    if (isSel) {
+      ctx.translate(cx, y + i * lineHeight);
+      ctx.scale(pulse, pulse);
+      ctx.translate(-cx, -(y + i * lineHeight));
+    }
+    ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.55)";
+    ctx.font = isSel ? "bold 26px system-ui" : "22px system-ui";
+    ctx.textAlign = "center";
+    if (isSel) drawTextWithShadow(options[i], cx, y + i * lineHeight, "#6bffb5", "rgba(0,0,0,0.4)", 4);
+    else ctx.fillText(options[i], cx, y + i * lineHeight);
+    ctx.restore();
   }
-  ctx.font = "14px system-ui";
-  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.font = "13px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.textAlign = "center";
   ctx.fillText("↑↓ Select  •  Enter / Space Confirm  •  Esc Back", WORLD.width / 2, WORLD.height * 0.78);
   ctx.restore();
 }
 
-function drawP2Settings() {
+function drawSettings(now) {
   clear();
   ctx.save();
-  const grad = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+  const t = now * 0.0002;
+  const grad = ctx.createLinearGradient(WORLD.width * 0.3 * Math.sin(t), 0, WORLD.width, WORLD.height);
   grad.addColorStop(0, "#1a1a2e");
   grad.addColorStop(1, "#16213e");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  fillRoundedRect(WORLD.width * 0.15, 100, WORLD.width * 0.7, 220, 16);
   ctx.fillStyle = "rgba(255,255,255,0.95)";
-  ctx.font = "bold 36px system-ui";
+  ctx.font = "bold 34px system-ui";
   ctx.textAlign = "center";
-  ctx.fillText("PLAYER 2 CONTROLS", WORLD.width / 2, 50);
+  drawTextWithShadow("SETTINGS", WORLD.width / 2, 52, "rgba(255,255,255,0.98)", "rgba(0,0,0,0.4)", 6);
   ctx.font = "14px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.fillText("↑↓ Select  •  Enter to rebind  •  R reset to defaults  •  Esc back", WORLD.width / 2, 82);
-  const startY = 130;
-  const lineH = 42;
+  ctx.fillText("↑↓ Select  •  ←→ Adjust volume  •  Enter confirm  •  Esc back", WORLD.width / 2, 86);
+  const startY = 148;
+  const lineH = 58;
+  const elapsed = now - (screenEnterTime || now);
+  const items = [
+    { label: "P2 Controls", value: "Rebind keys" },
+    { label: "Music Volume", value: musicVolume + "%" },
+    { label: "Effects Volume", value: effectsVolume + "%" },
+  ];
+  for (let i = 0; i < items.length; i++) {
+    const isSel = i === settingsSelection;
+    const anim = Math.min(1, (elapsed - i * 60) / 150);
+    ctx.globalAlpha = 0.5 + 0.5 * anim;
+    ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.85)";
+    ctx.font = isSel ? "bold 22px system-ui" : "20px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText(items[i].label, WORLD.width * 0.35, startY + i * lineH);
+    ctx.textAlign = "right";
+    ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.7)";
+    ctx.fillText(items[i].value, WORLD.width * 0.65, startY + i * lineH);
+    if (i > 0) {
+      const barW = 200;
+      const barX = WORLD.width / 2 - barW / 2;
+      const barY = startY + i * lineH + 10;
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      fillRoundedRect(barX, barY, barW, 10, 5);
+      ctx.fillStyle = isSel ? "#6bffb5" : "rgba(107,255,181,0.65)";
+      const fillW = barW * (i === 1 ? musicVolume : effectsVolume) / 100;
+      if (fillW > 0) fillRoundedRect(barX, barY, fillW, 10, 5);
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+function drawP2Settings(now) {
+  clear();
+  ctx.save();
+  const t = now * 0.0002;
+  const grad = ctx.createLinearGradient(WORLD.width * 0.2 * Math.cos(t), 0, WORLD.width, WORLD.height);
+  grad.addColorStop(0, "#1a1a2e");
+  grad.addColorStop(1, "#16213e");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  fillRoundedRect(WORLD.width * 0.2, 90, WORLD.width * 0.6, 260, 12);
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = "bold 32px system-ui";
+  ctx.textAlign = "center";
+  drawTextWithShadow("PLAYER 2 CONTROLS", WORLD.width / 2, 52, "rgba(255,255,255,0.98)", "rgba(0,0,0,0.4)", 6);
+  ctx.font = "14px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.fillText("↑↓ Select  •  Enter to rebind  •  R reset to defaults  •  Esc back", WORLD.width / 2, 84);
+  const startY = 132;
+  const lineH = 44;
+  const elapsed = now - (screenEnterTime || now);
   for (let i = 0; i < P2_SETTINGS_ACTIONS.length; i++) {
     const action = P2_SETTINGS_ACTIONS[i];
     const label = P2_SETTINGS_LABELS[i];
@@ -106,30 +261,35 @@ function drawP2Settings() {
     const disp = codeToDisplay(code);
     const isSel = i === p2SettingsSelection;
     const isRebinding = i === p2RebindingAction;
-    ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.8)";
+    const anim = Math.min(1, (elapsed - i * 40) / 120);
+    ctx.globalAlpha = 0.6 + 0.4 * anim;
+    ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.85)";
     ctx.font = isSel ? "bold 18px system-ui" : "16px system-ui";
     ctx.textAlign = "left";
     ctx.fillText(label, WORLD.width * 0.35, startY + i * lineH);
     ctx.textAlign = "right";
-    ctx.fillStyle = isRebinding ? "#ffb347" : "rgba(255,255,255,0.7)";
+    ctx.fillStyle = isRebinding ? "#ffb347" : "rgba(255,255,255,0.75)";
     ctx.fillText(isRebinding ? "Press any key..." : disp, WORLD.width * 0.65, startY + i * lineH);
+    ctx.globalAlpha = 1;
   }
   ctx.restore();
 }
 
-function drawCharacterSelect() {
+function drawCharacterSelect(now) {
   clear();
   ctx.save();
-  const grad = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+  const t = now * 0.00025;
+  const grad = ctx.createLinearGradient(WORLD.width * 0.25 * Math.sin(t), 0, WORLD.width, WORLD.height);
   grad.addColorStop(0, "#1a1a2e");
-  grad.addColorStop(1, "#16213e");
+  grad.addColorStop(0.5, "#16213e");
+  grad.addColorStop(1, "#0f3460");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
-  ctx.font = "bold 36px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = "bold 34px system-ui";
   ctx.textAlign = "center";
-  ctx.fillText("CHARACTER SELECT", WORLD.width / 2, 50);
-  ctx.font = "16px system-ui";
+  drawTextWithShadow("CHARACTER SELECT", WORLD.width / 2, 52, "rgba(255,255,255,0.98)", "rgba(0,0,0,0.4)", 6);
+  ctx.font = "15px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.55)";
   ctx.fillText("P1: 1 2 3  •  P2: Y U I  •  P1 color: Q E  •  P2 color: 7 9  •  Enter to start  •  Esc back", WORLD.width / 2, 88);
   const names = PLAYER_TYPES.map((t) => t.label);
@@ -137,36 +297,60 @@ function drawCharacterSelect() {
   const p2Color = COLOR_PALETTE[p2ColorIndex % COLOR_PALETTE.length];
   const p1x = WORLD.width * 0.28;
   const p2x = WORLD.width * 0.72;
-  const boxY = 140;
-  const boxW = 110;
-  const boxH = 140;
-  const gap = 16;
+  const boxY = 142;
+  const boxW = 112;
+  const boxH = 142;
+  const gap = 18;
   const totalW = 3 * boxW + 2 * gap;
+  const elapsed = now - (screenEnterTime || now);
+  const glow = 0.5 + 0.5 * Math.sin(now * 0.006);
   for (let i = 0; i < 3; i++) {
+    const anim = Math.min(1, (elapsed - i * 100) / 250);
     const x1 = p1x - totalW / 2 + i * (boxW + gap);
     const x2 = p2x - totalW / 2 + i * (boxW + gap);
     const isP1 = i === p1CharacterIndex;
     const isP2 = i === p2CharacterIndex;
-    ctx.strokeStyle = isP1 ? "#6bffb5" : "rgba(255,255,255,0.2)";
+    ctx.globalAlpha = 0.5 + 0.5 * anim;
+    if (isP1) {
+      ctx.shadowColor = "#6bffb5";
+      ctx.shadowBlur = 12 * glow;
+      ctx.strokeStyle = "#6bffb5";
+      ctx.lineWidth = 4;
+    } else {
+      ctx.strokeStyle = "rgba(255,255,255,0.25)";
+      ctx.lineWidth = 2;
+    }
+    ctx.fillStyle = (isP1 ? p1Color : PLAYER_TYPES[i].color) + "55";
+    roundRectPath(x1, boxY, boxW, boxH, 10);
+    ctx.fill();
+    ctx.strokeStyle = isP1 ? "#6bffb5" : "rgba(255,255,255,0.25)";
     ctx.lineWidth = isP1 ? 4 : 2;
-    ctx.strokeRect(x1, boxY, boxW, boxH);
-    ctx.fillStyle = (isP1 ? p1Color : PLAYER_TYPES[i].color) + "50";
-    ctx.fillRect(x1, boxY, boxW, boxH);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
     drawCharacterPortrait(PLAYER_TYPES[i].archetype, isP1 ? p1Color : PLAYER_TYPES[i].color, x1 + boxW / 2, boxY + boxH / 2 - 20, 44);
     ctx.fillStyle = "rgba(255,255,255,0.95)";
     ctx.font = "bold 15px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(names[i], x1 + boxW / 2, boxY + boxH - 22);
-    ctx.strokeStyle = isP2 ? "#ffb347" : "rgba(255,255,255,0.2)";
-    ctx.lineWidth = isP2 ? 4 : 2;
-    ctx.strokeRect(x2, boxY, boxW, boxH);
-    ctx.fillStyle = (isP2 ? p2Color : PLAYER_TYPES[i].color) + "50";
-    ctx.fillRect(x2, boxY, boxW, boxH);
+    ctx.fillText(names[i], x1 + boxW / 2, boxY + boxH - 24);
+    if (isP2) {
+      ctx.shadowColor = "#ffb347";
+      ctx.shadowBlur = 12 * glow;
+      ctx.strokeStyle = "#ffb347";
+      ctx.lineWidth = 4;
+    } else {
+      ctx.strokeStyle = "rgba(255,255,255,0.25)";
+      ctx.lineWidth = 2;
+    }
+    ctx.fillStyle = (isP2 ? p2Color : PLAYER_TYPES[i].color) + "55";
+    roundRectPath(x2, boxY, boxW, boxH, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
     drawCharacterPortrait(PLAYER_TYPES[i].archetype, isP2 ? p2Color : PLAYER_TYPES[i].color, x2 + boxW / 2, boxY + boxH / 2 - 20, 44);
     ctx.fillStyle = "rgba(255,255,255,0.95)";
     ctx.font = "bold 15px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(names[i], x2 + boxW / 2, boxY + boxH - 22);
+    ctx.fillText(names[i], x2 + boxW / 2, boxY + boxH - 24);
   }
   ctx.fillStyle = "#6bffb5";
   ctx.font = "bold 18px system-ui";

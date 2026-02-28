@@ -2,18 +2,37 @@
 "use strict";
 
 let lastTime = performance.now();
+let prevGameState = null;
 function loop(now) {
+  if (prevGameState !== gameState && !transitionActive) screenEnterTime = now;
+  prevGameState = gameState;
+
+  if (transitionActive) updateScreenTransition(now);
+
   const rawDt = (now - lastTime) / 1000;
   lastTime = now;
   const dt = Math.min(rawDt, 1 / 30);
 
+  if (gameState === GAME_STATE.MENU || gameState === GAME_STATE.SETTINGS) {
+    playMenuMusic();
+  } else {
+    stopMenuMusic();
+  }
+  if (gameState === GAME_STATE.TITLE) {
+    drawTitleScreen(now);
+    drawTransitionOverlay();
+    requestAnimationFrame(loop);
+    return;
+  }
   if (gameState === GAME_STATE.MENU) {
     drawMenu(now);
+    drawTransitionOverlay();
     requestAnimationFrame(loop);
     return;
   }
   if (gameState === GAME_STATE.VERSUS_SELECT) {
     drawCharacterSelect(now);
+    drawTransitionOverlay();
     requestAnimationFrame(loop);
     return;
   }
@@ -23,8 +42,15 @@ function loop(now) {
     requestAnimationFrame(loop);
     return;
   }
+  if (gameState === GAME_STATE.SETTINGS) {
+    drawSettings(now);
+    drawTransitionOverlay();
+    requestAnimationFrame(loop);
+    return;
+  }
   if (gameState === GAME_STATE.P2_SETTINGS) {
     drawP2Settings(now);
+    drawTransitionOverlay();
     requestAnimationFrame(loop);
     return;
   }

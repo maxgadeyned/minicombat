@@ -20,14 +20,45 @@ window.addEventListener("keydown", (e) => {
   if (e.repeat) return;
   keys.add(e.code);
 
+  if (gameState === GAME_STATE.TITLE) {
+    startTransition(GAME_STATE.MENU);
+    menuSelection = 0;
+    return;
+  }
   if (gameState === GAME_STATE.MENU) {
     if (e.code === "ArrowDown") { menuSelection = (menuSelection + 1) % 4; return; }
     if (e.code === "ArrowUp") { menuSelection = (menuSelection - 1 + 4) % 4; return; }
     if (e.code === "Enter" || e.code === "Space") {
-      if (menuSelection === 0) { gameState = GAME_STATE.VERSUS_SELECT; p1CharacterIndex = 0; p2CharacterIndex = 0; p1ColorIndex = 0; p2ColorIndex = 0; }
+      if (menuSelection === 0) { startTransition(GAME_STATE.VERSUS_SELECT); p1CharacterIndex = 0; p2CharacterIndex = 0; p1ColorIndex = 0; p2ColorIndex = 0; }
       else if (menuSelection === 1) startPractice();
       else if (menuSelection === 2) startTutorial();
-      else { gameState = GAME_STATE.P2_SETTINGS; p2SettingsSelection = 0; p2RebindingAction = null; }
+      else { startTransition(GAME_STATE.SETTINGS); settingsSelection = 0; }
+    }
+    return;
+  }
+
+  if (gameState === GAME_STATE.SETTINGS) {
+    if (e.code === "Escape" || e.code === "Backspace") {
+      startTransition(GAME_STATE.MENU);
+      return;
+    }
+    if (e.code === "ArrowDown") { settingsSelection = (settingsSelection + 1) % 3; return; }
+    if (e.code === "ArrowUp") { settingsSelection = (settingsSelection - 1 + 3) % 3; return; }
+    if (e.code === "ArrowLeft") {
+      if (settingsSelection === 1) { setMusicVolume(Math.max(0, musicVolume - 10)); return; }
+      if (settingsSelection === 2) { setEffectsVolume(Math.max(0, effectsVolume - 10)); return; }
+    }
+    if (e.code === "ArrowRight") {
+      if (settingsSelection === 1) { setMusicVolume(Math.min(100, musicVolume + 10)); return; }
+      if (settingsSelection === 2) { setEffectsVolume(Math.min(100, effectsVolume + 10)); return; }
+    }
+    if (e.code === "Enter" || e.code === "Space") {
+      if (settingsSelection === 0) {
+        startTransition(GAME_STATE.P2_SETTINGS);
+        p2SettingsSelection = 0;
+        p2RebindingAction = null;
+        p2SettingsFromSettings = true;
+      }
     }
     return;
   }
@@ -43,7 +74,8 @@ window.addEventListener("keydown", (e) => {
       p2RebindingAction = null;
     } else {
       if (e.code === "Escape" || e.code === "Backspace") {
-        gameState = GAME_STATE.MENU;
+        startTransition(p2SettingsFromSettings ? GAME_STATE.SETTINGS : GAME_STATE.MENU);
+        p2SettingsFromSettings = false;
         return;
       }
       if (e.code === "ArrowDown") { p2SettingsSelection = (p2SettingsSelection + 1) % P2_SETTINGS_ACTIONS.length; return; }
@@ -146,5 +178,12 @@ window.addEventListener("keyup", (e) => {
   if (e.code === "KeyV") player.blocking = false;
   if (player2 && e.code === p2Keybinds.block) player2.blocking = false;
   if (player2 && e.code === p2Keybinds.jump && player2.vel.y < 0 && !player2.lastJumpWasDouble) player2.vel.y *= 0.5;
+});
+
+window.addEventListener("click", () => {
+  if (gameState === GAME_STATE.TITLE) {
+    startTransition(GAME_STATE.MENU);
+    menuSelection = 0;
+  }
 });
 

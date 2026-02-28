@@ -1,9 +1,48 @@
 "use strict";
 
-const GAME_STATE = { MENU: "menu", PRACTICE: "practice", VERSUS_SELECT: "versus_select", TRANSITION: "transition", VERSUS: "versus", P2_SETTINGS: "p2_settings" };
-let gameState = GAME_STATE.MENU;
+const GAME_STATE = { TITLE: "title", MENU: "menu", PRACTICE: "practice", VERSUS_SELECT: "versus_select", TRANSITION: "transition", VERSUS: "versus", P2_SETTINGS: "p2_settings", SETTINGS: "settings" };
+let gameState = GAME_STATE.TITLE;
+let screenEnterTime = 0;
+let transitionActive = false;
+let transitionPhase = "out";
+let transitionProgress = 0;
+let transitionNextState = null;
+let transitionPhaseStartTime = 0;
+const SCREEN_TRANSITION_DURATION_MS = 220;
+
+function startTransition(nextState) {
+  if (transitionActive) return;
+  transitionActive = true;
+  transitionPhase = "out";
+  transitionProgress = 0;
+  transitionNextState = nextState;
+  transitionPhaseStartTime = performance.now();
+}
+
+function updateScreenTransition(now) {
+  if (!transitionActive) return;
+  transitionProgress = Math.min(1, (now - transitionPhaseStartTime) / SCREEN_TRANSITION_DURATION_MS);
+  if (transitionPhase === "out" && transitionProgress >= 1) {
+    transitionProgress = 0;
+    transitionPhase = "in";
+    transitionPhaseStartTime = now;
+    gameState = transitionNextState;
+    screenEnterTime = now;
+  } else if (transitionPhase === "in" && transitionProgress >= 1) {
+    transitionActive = false;
+    transitionNextState = null;
+  }
+}
+
+function getTransitionOverlayAlpha() {
+  if (!transitionActive) return 0;
+  return transitionPhase === "out" ? transitionProgress : 1 - transitionProgress;
+}
+
 let menuSelection = 0;
+let settingsSelection = 0;
 let p2SettingsSelection = 0;
+let p2SettingsFromSettings = false;
 let p2RebindingAction = null;
 const P2_SETTINGS_ACTIONS = ["moveLeft", "moveRight", "jump", "fastFall", "dash", "special", "heavy", "block"];
 const P2_SETTINGS_LABELS = ["Move Left", "Move Right", "Jump", "Fast Fall", "Dash", "Special", "Heavy", "Block"];
@@ -446,7 +485,7 @@ function getTransitionCountdown(now) {
 }
 
 function goToMenu() {
-  gameState = GAME_STATE.MENU;
+  startTransition(GAME_STATE.MENU);
   menuSelection = 0;
 }
 
