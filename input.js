@@ -21,11 +21,12 @@ window.addEventListener("keydown", (e) => {
   keys.add(e.code);
 
   if (gameState === GAME_STATE.MENU) {
-    if (e.code === "ArrowDown") { menuSelection = (menuSelection + 1) % 3; return; }
-    if (e.code === "ArrowUp") { menuSelection = (menuSelection - 1 + 3) % 3; return; }
+    if (e.code === "ArrowDown") { menuSelection = (menuSelection + 1) % 4; return; }
+    if (e.code === "ArrowUp") { menuSelection = (menuSelection - 1 + 4) % 4; return; }
     if (e.code === "Enter" || e.code === "Space") {
-      if (menuSelection === 0) startPractice();
-      else if (menuSelection === 1) { gameState = GAME_STATE.VERSUS_SELECT; p1CharacterIndex = 0; p2CharacterIndex = 0; p1ColorIndex = 0; p2ColorIndex = 0; }
+      if (menuSelection === 0) { gameState = GAME_STATE.VERSUS_SELECT; p1CharacterIndex = 0; p2CharacterIndex = 0; p1ColorIndex = 0; p2ColorIndex = 0; }
+      else if (menuSelection === 1) startPractice();
+      else if (menuSelection === 2) startTutorial();
       else { gameState = GAME_STATE.P2_SETTINGS; p2SettingsSelection = 0; p2RebindingAction = null; }
     }
     return;
@@ -75,13 +76,20 @@ window.addEventListener("keydown", (e) => {
 
   if (gameState !== GAME_STATE.PRACTICE && gameState !== GAME_STATE.VERSUS) return;
 
+  if (tutorialMode && tutorialComplete && (e.code === "Escape" || e.code === "Enter" || e.code === "Space")) {
+    goToMenu();
+    tutorialMode = false;
+    tutorialComplete = false;
+    return;
+  }
+
   if (gamePaused) {
     if (e.code === "Escape") { gamePaused = false; return; }
     if (e.code === "ArrowDown") { pauseMenuSelection = (pauseMenuSelection + 1) % 2; return; }
     if (e.code === "ArrowUp") { pauseMenuSelection = (pauseMenuSelection - 1 + 2) % 2; return; }
     if (e.code === "Enter" || e.code === "Space") {
       if (pauseMenuSelection === 0) gamePaused = false;
-      else { goToMenu(); gamePaused = false; roundOver = false; }
+      else { goToMenu(); gamePaused = false; roundOver = false; roundOverWinner = null; }
     }
     return;
   }
@@ -90,9 +98,9 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "ArrowDown") { roundOverSelection = (roundOverSelection + 1) % 3; return; }
     if (e.code === "ArrowUp") { roundOverSelection = (roundOverSelection - 1 + 3) % 3; return; }
     if (e.code === "Enter" || e.code === "Space" || (e.code === "KeyR" && roundOverSelection === 0)) {
-      if (roundOverSelection === 0) { roundOver = false; goToTransition(); }
-      else if (roundOverSelection === 1) { gameState = GAME_STATE.VERSUS_SELECT; roundOver = false; }
-      else { goToMenu(); roundOver = false; }
+      if (roundOverSelection === 0) { roundOver = false; roundOverWinner = null; goToTransition(); }
+      else if (roundOverSelection === 1) { gameState = GAME_STATE.VERSUS_SELECT; roundOver = false; roundOverWinner = null; }
+      else { goToMenu(); roundOver = false; roundOverWinner = null; }
     }
     return;
   }
@@ -124,8 +132,8 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "KeyT") dummyMode = (dummyMode + 1) % DUMMY_MODE_LABELS.length;
   }
   if (e.code === "Escape") { gamePaused = true; pauseMenuSelection = 0; return; }
-  if (e.code === "KeyX") performPlayerSpecial();
-  else if (e.code === "KeyC") spawnAttack("heavy");
+  if (e.code === "KeyX") { performPlayerSpecial(); if (tutorialMode && tutorialStep === 2) tutorialSpecialDone = true; }
+  else if (e.code === "KeyC") { spawnAttack("heavy"); if (tutorialMode && tutorialStep === 2) tutorialHeavyDone = true; }
   if (e.code === "KeyR") { if (gameState === GAME_STATE.VERSUS && roundOver) return; hardReset(); }
 });
 

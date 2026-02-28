@@ -70,7 +70,7 @@ function applyBlastZoneRespawn(fighter, isDummy) {
   }
   if (fighter === player2) {
     player2Stocks = Math.max(0, player2Stocks - 1);
-    if (player2Stocks <= 0) { roundOver = true; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
+    if (player2Stocks <= 0) { roundOver = true; roundOverStartTime = performance.now(); roundOverWinner = player; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
     fighter.pos.x = player2Start.x; fighter.pos.y = player2Start.y;
     fighter.prevPos.x = player2Start.x; fighter.prevPos.y = player2Start.y;
     fighter.vel.x = 0; fighter.vel.y = 0; fighter.damage = 0;
@@ -78,7 +78,7 @@ function applyBlastZoneRespawn(fighter, isDummy) {
     updateHUD();
   } else if (isDummy) {
     dummyStocks = Math.max(0, dummyStocks - 1);
-    if (dummyStocks <= 0) { roundOver = true; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
+    if (dummyStocks <= 0) { roundOver = true; roundOverStartTime = performance.now(); roundOverWinner = player; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
     fighter.pos.x = dummyStart.x; fighter.pos.y = dummyStart.y;
     fighter.prevPos.x = dummyStart.x; fighter.prevPos.y = dummyStart.y;
     fighter.vel.x = 0; fighter.vel.y = 0; fighter.damage = 0;
@@ -86,7 +86,7 @@ function applyBlastZoneRespawn(fighter, isDummy) {
     updateHUD();
   } else {
     playerStocks = Math.max(0, playerStocks - 1);
-    if (playerStocks <= 0) { roundOver = true; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
+    if (playerStocks <= 0) { roundOver = true; roundOverStartTime = performance.now(); roundOverWinner = gameState === GAME_STATE.VERSUS ? player2 : dummy; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
     fighter.pos.x = playerStart.x; fighter.pos.y = playerStart.y;
     fighter.prevPos.x = playerStart.x; fighter.prevPos.y = playerStart.y;
     fighter.vel.x = 0; fighter.vel.y = 0; fighter.jumpsRemaining = 2; fighter.damage = 0;

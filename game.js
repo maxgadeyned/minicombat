@@ -14,11 +14,29 @@ const TRANSITION_DURATION_MS = 3500;
 
 let playerStocks = MAX_STOCKS, dummyStocks = MAX_STOCKS, player2Stocks = MAX_STOCKS, roundOver = false;
 let roundOverSelection = 0;
+let roundOverStartTime = 0;
+let roundOverWinner = null;
 let gamePaused = false;
 let pauseMenuSelection = 0;
 let bestComboCount = 0, bestComboDamage = 0;
 const DUMMY_MODE_LABELS = ["PASSIVE", "ATTACK", "PARRY TRAIN"];
 let dummyMode = 1;
+let tutorialMode = false;
+let tutorialStep = 0;
+let tutorialMoveStartX = 0;
+let tutorialJumpStartGround = false;
+let tutorialHeavyDone = false;
+let tutorialSpecialDone = false;
+let tutorialComplete = false;
+let tutorialCompleteAt = 0;
+const TUTORIAL_COMPLETE_DELAY_MS = 1500;
+const TUTORIAL_STEPS = [
+  { text: "Move with A and D", done: () => Math.abs(player.pos.x - tutorialMoveStartX) > 30 },
+  { text: "Jump with Space", done: () => !player.onGround && tutorialJumpStartGround },
+  { text: "Attack with C (heavy) AND X (special)", done: () => tutorialHeavyDone && tutorialSpecialDone },
+  { text: "Block with V", done: () => player.blocking },
+  { text: "Parry: block just before the dummy hits you!", done: () => hitEffects.some(e => e.type === "text" && e.text === "PARRY!") },
+];
 let dummyNextAttackAt = performance.now() + 1000;
 let hitstopUntil = 0, shakeUntil = 0, shakeMagnitude = 0;
 let koSlowmoUntil = 0, koFlashUntil = 0;
@@ -316,8 +334,45 @@ function getOpponent() {
   return gameState === GAME_STATE.VERSUS ? player2 : dummy;
 }
 
+function updateTutorial(now) {
+  if (!tutorialMode || !player || gamePaused || roundOver) return;
+  if (tutorialStep >= TUTORIAL_STEPS.length) {
+    if (tutorialCompleteAt > 0 && now - tutorialCompleteAt >= TUTORIAL_COMPLETE_DELAY_MS) tutorialComplete = true;
+    return;
+  }
+  if (tutorialStep === 1 && player.onGround) tutorialJumpStartGround = true;
+  if (TUTORIAL_STEPS[tutorialStep].done()) {
+    tutorialStep++;
+    tutorialMoveStartX = player.pos.x;
+    tutorialJumpStartGround = player.onGround;
+    tutorialHeavyDone = false;
+    tutorialSpecialDone = false;
+    if (tutorialStep >= TUTORIAL_STEPS.length) tutorialCompleteAt = now;
+    dummyMode = tutorialStep >= 4 ? 2 : 0;
+  }
+}
+
 function startPractice() {
   gameState = GAME_STATE.PRACTICE;
+  tutorialMode = false;
+  _initPractice();
+}
+
+function startTutorial() {
+  gameState = GAME_STATE.PRACTICE;
+  tutorialMode = true;
+  tutorialStep = 0;
+  tutorialComplete = false;
+  tutorialCompleteAt = 0;
+  tutorialMoveStartX = playerStart.x;
+  tutorialJumpStartGround = true;
+  tutorialHeavyDone = false;
+  tutorialSpecialDone = false;
+  _initPractice();
+  dummyMode = tutorialStep >= 4 ? 2 : 0;
+}
+
+function _initPractice() {
   player = createFighter({ x: playerStart.x, y: playerStart.y, w: 40, h: 70, color: "#3da1ff" });
   playerTypeIndex = 0;
   applyPlayerType(playerTypeIndex);
@@ -332,11 +387,19 @@ function startPractice() {
   playerStocks = MAX_STOCKS;
   dummyStocks = MAX_STOCKS;
   roundOver = false;
+  roundOverWinner = null;
   bestComboCount = 0;
   bestComboDamage = 0;
   hitEffects.length = 0;
   currentComboCount = 0;
   currentComboDamage = 0;
+  if (tutorialMode) {
+    tutorialMoveStartX = playerStart.x;
+    tutorialJumpStartGround = true;
+    tutorialHeavyDone = false;
+    tutorialSpecialDone = false;
+    dummyMode = tutorialStep >= 4 ? 2 : 0;
+  }
   updateHUD();
 }
 
@@ -352,6 +415,7 @@ function startVersusMatch() {
   playerStocks = MAX_STOCKS;
   player2Stocks = MAX_STOCKS;
   roundOver = false;
+  roundOverWinner = null;
   bestComboCount = 0;
   bestComboDamage = 0;
   hitEffects.length = 0;
@@ -387,7 +451,9 @@ function goToMenu() {
 }
 
 function hardReset() {
-  if (gameState === GAME_STATE.PRACTICE) startPractice();
-  else if (gameState === GAME_STATE.VERSUS) startVersusMatch();
+  if (gameState === GAME_STATE.PRACTICE) {
+    if (tutorialMode) startTutorial();
+    else startPractice();
+  } else if (gameState === GAME_STATE.VERSUS) startVersusMatch();
 }
 

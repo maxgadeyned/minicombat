@@ -46,6 +46,7 @@ function loop(now) {
     resolvePlayerDummyCollision();
     applyBlastZoneRespawn(player, false);
     handleCombat(dtScaled, now);
+    updateTutorial(now);
   }
   draw(now);
   requestAnimationFrame(loop);
