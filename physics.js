@@ -13,7 +13,8 @@ function integrateFighter(fighter, dt) {
 
   fighter.prevPos.x = fighter.pos.x;
   fighter.prevPos.y = fighter.pos.y;
-  const fastFall = fighter.onGround ? false : (fighter === player2 ? keys.has(p2Keybinds.fastFall) : keys.has("KeyS"));
+  const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
+  const fastFall = fighter.onGround ? false : (fighter === player2 ? keys.has(p2Keybinds.fastFall) : keys.has(p1Keys.fastFall));
   const gravityMult = fastFall ? FAST_FALL_MULTIPLIER : 1;
   fighter.vel.y += GRAVITY * gravityMult * dt;
   fighter.pos.x += fighter.vel.x * dt;
@@ -65,32 +66,43 @@ function applyBlastZoneRespawn(fighter, isDummy) {
   if (!roundOver) {
     koSlowmoUntil = Math.max(koSlowmoUntil || 0, nowMs + KO_SLOWMO_MS);
     koFlashUntil = Math.max(koFlashUntil || 0, nowMs + KO_FLASH_MS);
-    shakeUntil = Math.max(shakeUntil, nowMs + 280);
-    shakeMagnitude = Math.max(shakeMagnitude, SHAKE_HEAVY * 1.25);
+    shakeUntil = Math.max(shakeUntil, nowMs + 350);
+    shakeMagnitude = Math.max(shakeMagnitude, SHAKE_KO);
+    playSfx("ko");
   }
+  // Respawn at the center of the platform; they will fall in from above.
+  const spawnX = PLATFORM.x + PLATFORM.width / 2;
+  const spawnY = PLATFORM.y - fighter.size.h - 260;
+
   if (fighter === player2) {
     player2Stocks = Math.max(0, player2Stocks - 1);
     if (player2Stocks <= 0) { roundOver = true; roundOverStartTime = performance.now(); roundOverWinner = player; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
-    fighter.pos.x = player2Start.x; fighter.pos.y = player2Start.y;
-    fighter.prevPos.x = player2Start.x; fighter.prevPos.y = player2Start.y;
+    fighter.pos.x = spawnX; fighter.pos.y = spawnY;
+    fighter.prevPos.x = spawnX; fighter.prevPos.y = spawnY;
     fighter.vel.x = 0; fighter.vel.y = 0; fighter.damage = 0;
     fighter.jumpsRemaining = 2; fighter.lastJumpWasDouble = false;
+    fighter.invulnUntil = nowMs + RESPAWN_INVULN_MS;
+    fighter.onGround = false;
     updateHUD();
   } else if (isDummy) {
     dummyStocks = Math.max(0, dummyStocks - 1);
     if (dummyStocks <= 0) { roundOver = true; roundOverStartTime = performance.now(); roundOverWinner = player; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
-    fighter.pos.x = dummyStart.x; fighter.pos.y = dummyStart.y;
-    fighter.prevPos.x = dummyStart.x; fighter.prevPos.y = dummyStart.y;
+    fighter.pos.x = spawnX; fighter.pos.y = spawnY;
+    fighter.prevPos.x = spawnX; fighter.prevPos.y = spawnY;
     fighter.vel.x = 0; fighter.vel.y = 0; fighter.damage = 0;
     fighter.jumpsRemaining = 2; fighter.lastJumpWasDouble = false;
+    fighter.invulnUntil = nowMs + RESPAWN_INVULN_MS;
+    fighter.onGround = false;
     updateHUD();
   } else {
     playerStocks = Math.max(0, playerStocks - 1);
     if (playerStocks <= 0) { roundOver = true; roundOverStartTime = performance.now(); roundOverWinner = gameState === GAME_STATE.VERSUS ? player2 : dummy; if (gameState === GAME_STATE.VERSUS) roundOverSelection = 0; }
-    fighter.pos.x = playerStart.x; fighter.pos.y = playerStart.y;
-    fighter.prevPos.x = playerStart.x; fighter.prevPos.y = playerStart.y;
+    fighter.pos.x = spawnX; fighter.pos.y = spawnY;
+    fighter.prevPos.x = spawnX; fighter.prevPos.y = spawnY;
     fighter.vel.x = 0; fighter.vel.y = 0; fighter.jumpsRemaining = 2; fighter.damage = 0;
     fighter.lastJumpWasDouble = false;
+    fighter.invulnUntil = nowMs + RESPAWN_INVULN_MS;
+    fighter.onGround = false;
     updateHUD();
   }
 }

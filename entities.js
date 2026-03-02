@@ -16,6 +16,7 @@ function createFighter(options) {
     parryLockoutUntil: 0,
     stunnedUntil: 0,
     parryFlashUntil: 0,
+    invulnUntil: 0,
     nextLightAt: 0,
     nextHeavyAt: 0,
     rollingUntil: 0,

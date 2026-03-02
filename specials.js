@@ -4,10 +4,11 @@ function performPlayerSpecial() {
   const now = performance.now();
   if (now < (player.nextSpecialAt || 0)) return;
   const isAir = !player.onGround;
+  const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
   let input = "neutral";
   if (isAir) input = "air";
-  else if (keys.has("KeyS")) input = "down";
-  else if (keys.has("KeyA") || keys.has("KeyD")) input = "right";
+  else if (keys.has(p1Keys.fastFall)) input = "down";
+  else if (keys.has(p1Keys.moveLeft) || keys.has(p1Keys.moveRight)) input = "right";
   performSpecialFor(player, "player", input, now);
 }
 

@@ -13,7 +13,7 @@ function loop(now) {
   lastTime = now;
   const dt = Math.min(rawDt, 1 / 30);
 
-  if (gameState === GAME_STATE.MENU || gameState === GAME_STATE.SETTINGS || gameState === GAME_STATE.CREDITS) {
+  if (gameState === GAME_STATE.MENU || gameState === GAME_STATE.SETTINGS || gameState === GAME_STATE.CREDITS || gameState === GAME_STATE.P1_SETTINGS) {
     playMenuMusic();
   } else {
     stopMenuMusic();
@@ -36,6 +36,13 @@ function loop(now) {
     requestAnimationFrame(loop);
     return;
   }
+  if (gameState === GAME_STATE.VERSUS_INTRO) {
+    if (!transitionActive && now - screenEnterTime >= 3000) startTransition(GAME_STATE.TRANSITION);
+    drawVersusIntro(now);
+    drawTransitionOverlay();
+    requestAnimationFrame(loop);
+    return;
+  }
   if (gameState === GAME_STATE.TRANSITION) {
     updateTransition(now);
     drawTransition(now);
@@ -51,6 +58,12 @@ function loop(now) {
   if (gameState === GAME_STATE.CREDITS) {
     playMenuMusic();
     drawCredits(now);
+    drawTransitionOverlay();
+    requestAnimationFrame(loop);
+    return;
+  }
+  if (gameState === GAME_STATE.P1_SETTINGS) {
+    drawP1Settings(now);
     drawTransitionOverlay();
     requestAnimationFrame(loop);
     return;

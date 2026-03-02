@@ -1,6 +1,8 @@
 "use strict";
 
 const P2_KEYBINDS_STORAGE = "minCombat_p2Keybinds";
+const P1_SOLO_KEYBINDS_STORAGE = "minCombat_p1SoloKeybinds";
+const P1_LOCAL_KEYBINDS_STORAGE = "minCombat_p1LocalKeybinds";
 
 const P2_KEYBINDS_DEFAULT = {
   moveLeft: "KeyJ",
@@ -13,7 +15,12 @@ const P2_KEYBINDS_DEFAULT = {
   block: "Quote",
 };
 
+const P1_SOLO_DEFAULT = { moveLeft: "KeyA", moveRight: "KeyD", jump: "Space", fastFall: "KeyS", dash: "KeyW", special: "KeyF", heavy: "KeyG", block: "KeyH" };
+const P1_LOCAL_DEFAULT = { moveLeft: "KeyA", moveRight: "KeyD", jump: "Space", fastFall: "KeyS", dash: "KeyW", special: "KeyX", heavy: "KeyC", block: "KeyV" };
+
 let p2Keybinds = { ...P2_KEYBINDS_DEFAULT };
+let p1SoloKeybinds = { ...P1_SOLO_DEFAULT };
+let p1LocalKeybinds = { ...P1_LOCAL_DEFAULT };
 
 function loadP2Keybinds() {
   try {
@@ -36,6 +43,59 @@ function resetP2Keybinds() {
   saveP2Keybinds();
 }
 
+function loadP1SoloKeybinds() {
+  try {
+    const stored = localStorage.getItem(P1_SOLO_KEYBINDS_STORAGE);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      p1SoloKeybinds = { ...P1_SOLO_DEFAULT, ...parsed };
+    }
+  } catch (_) {}
+}
+
+function saveP1SoloKeybinds() {
+  try {
+    localStorage.setItem(P1_SOLO_KEYBINDS_STORAGE, JSON.stringify(p1SoloKeybinds));
+  } catch (_) {}
+}
+
+function loadP1LocalKeybinds() {
+  try {
+    const stored = localStorage.getItem(P1_LOCAL_KEYBINDS_STORAGE);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      p1LocalKeybinds = { ...P1_LOCAL_DEFAULT, ...parsed };
+    }
+  } catch (_) {}
+}
+
+function saveP1LocalKeybinds() {
+  try {
+    localStorage.setItem(P1_LOCAL_KEYBINDS_STORAGE, JSON.stringify(p1LocalKeybinds));
+  } catch (_) {}
+}
+
+function getP1Keybinds(profile) {
+  return profile === "local" ? { ...p1LocalKeybinds } : { ...p1SoloKeybinds };
+}
+
+function setP1Keybind(profile, action, code) {
+  const obj = profile === "local" ? p1LocalKeybinds : p1SoloKeybinds;
+  obj[action] = code;
+  if (profile === "local") saveP1LocalKeybinds();
+  else saveP1SoloKeybinds();
+}
+
+function resetP1SoloKeybinds() {
+  p1SoloKeybinds = { ...P1_SOLO_DEFAULT };
+  saveP1SoloKeybinds();
+}
+
+function resetP1LocalKeybinds() {
+  p1LocalKeybinds = { ...P1_LOCAL_DEFAULT };
+  saveP1LocalKeybinds();
+}
+
 function codeToDisplay(code) {
   if (!code) return "?";
   if (code === "Minus") return "-";
@@ -53,6 +113,21 @@ function codeToDisplay(code) {
   return code;
 }
 
+function getP1KeybindConflict(profile, action, code) {
+  const obj = profile === "local" ? p1LocalKeybinds : p1SoloKeybinds;
+  for (const k of Object.keys(obj)) {
+    if (k !== action && obj[k] === code) return k;
+  }
+  return null;
+}
+
+function getP2KeybindConflict(action, code) {
+  for (const k of Object.keys(p2Keybinds)) {
+    if (k !== action && p2Keybinds[k] === code) return k;
+  }
+  return null;
+}
+
 function isP2Key(e) {
   const code = e.code;
   return (
@@ -68,3 +143,5 @@ function isP2Key(e) {
 }
 
 loadP2Keybinds();
+loadP1SoloKeybinds();
+loadP1LocalKeybinds();

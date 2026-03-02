@@ -1,6 +1,6 @@
 "use strict";
 
-const GAME_STATE = { TITLE: "title", MENU: "menu", PRACTICE: "practice", VERSUS_SELECT: "versus_select", TRANSITION: "transition", VERSUS: "versus", P2_SETTINGS: "p2_settings", SETTINGS: "settings", CREDITS: "credits" };
+const GAME_STATE = { TITLE: "title", MENU: "menu", PRACTICE: "practice", VERSUS_SELECT: "versus_select", VERSUS_INTRO: "versus_intro", TRANSITION: "transition", VERSUS: "versus", P1_SETTINGS: "p1_settings", P2_SETTINGS: "p2_settings", SETTINGS: "settings", CREDITS: "credits" };
 let gameState = GAME_STATE.TITLE;
 let screenEnterTime = 0;
 let transitionActive = false;
@@ -28,6 +28,10 @@ function updateScreenTransition(now) {
     transitionPhaseStartTime = now;
     gameState = transitionNextState;
     screenEnterTime = now;
+    if (transitionNextState === GAME_STATE.TRANSITION) {
+      transitionStartTime = now;
+      spawnVersusFighters();
+    }
   } else if (transitionPhase === "in" && transitionProgress >= 1) {
     transitionActive = false;
     transitionNextState = null;
@@ -46,6 +50,17 @@ let p2SettingsFromSettings = false;
 let p2RebindingAction = null;
 const P2_SETTINGS_ACTIONS = ["moveLeft", "moveRight", "jump", "fastFall", "dash", "special", "heavy", "block"];
 const P2_SETTINGS_LABELS = ["Move Left", "Move Right", "Jump", "Fast Fall", "Dash", "Special", "Heavy", "Block"];
+
+let p1SettingsMode = "profile";
+let p1SettingsProfile = "solo";
+let p1SettingsSelection = 0;
+let p1RebindingAction = null;
+let p1SettingsFromSettings = true;
+let p1RebindConflict = null;
+let p2RebindConflict = null;
+const P1_SETTINGS_ACTIONS = ["moveLeft", "moveRight", "jump", "fastFall", "dash", "special", "heavy", "block"];
+const P1_SETTINGS_LABELS = ["Move Left", "Move Right", "Jump", "Fast Fall", "Dash", "Special", "Heavy", "Block"];
+const P1_PROFILE_OPTIONS = [{ label: "Playing alone", profile: "solo" }, { label: "Local 2P (same keyboard)", profile: "local" }];
 let p1CharacterIndex = 0, p2CharacterIndex = 0;
 let p1ColorIndex = 0, p2ColorIndex = 0;
 let stageIndex = 0;
@@ -72,10 +87,10 @@ let tutorialComplete = false;
 let tutorialCompleteAt = 0;
 const TUTORIAL_COMPLETE_DELAY_MS = 1500;
 const TUTORIAL_STEPS = [
-  { text: "Move with A and D", done: () => Math.abs(player.pos.x - tutorialMoveStartX) > 30 },
-  { text: "Jump with Space", done: () => !player.onGround && tutorialJumpStartGround },
-  { text: "Attack with C (heavy) AND X (special)", done: () => tutorialHeavyDone && tutorialSpecialDone },
-  { text: "Block with V", done: () => player.blocking },
+  { text: () => `Move with ${codeToDisplay(getP1Keybinds("solo").moveLeft)} and ${codeToDisplay(getP1Keybinds("solo").moveRight)}`, done: () => Math.abs(player.pos.x - tutorialMoveStartX) > 30 },
+  { text: () => `Jump with ${codeToDisplay(getP1Keybinds("solo").jump)}`, done: () => !player.onGround && tutorialJumpStartGround },
+  { text: () => `Attack with ${codeToDisplay(getP1Keybinds("solo").heavy)} (heavy) AND ${codeToDisplay(getP1Keybinds("solo").special)} (special)`, done: () => tutorialHeavyDone && tutorialSpecialDone },
+  { text: () => `Block with ${codeToDisplay(getP1Keybinds("solo").block)}`, done: () => player.blocking },
   { text: "Parry: block just before the dummy hits you!", done: () => hitEffects.some(e => e.type === "text" && e.text === "PARRY!") },
 ];
 let dummyNextAttackAt = performance.now() + 1000;
@@ -95,8 +110,9 @@ function handlePlayerInput(dt, now) {
   }
   blockKeyJustPressed = false;
 
+  const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
   let moveDir = 0;
-  if (!inStun) { if (keys.has("KeyA")) moveDir -= 1; if (keys.has("KeyD")) moveDir += 1; }
+  if (!inStun) { if (keys.has(p1Keys.moveLeft)) moveDir -= 1; if (keys.has(p1Keys.moveRight)) moveDir += 1; }
   const moveSpeed = player.moveSpeed || MOVE_SPEED;
 
   if (!rolling) {
@@ -229,6 +245,7 @@ function handleCombat(dt, now) {
 
     const applyHit = (victim, attacker) => {
       const isLight = hb.kind === "light";
+      if (victim.invulnUntil && now < victim.invulnUntil) return;
       const canBlock = !hb.ignoreBlock && victim.onGround && victim.blocking;
       const isParry = canBlock && now < victim.parryWindowUntil;
       let knockbackMult = 1;
@@ -281,7 +298,8 @@ function handleCombat(dt, now) {
       let vy = (knockbackMagnitude * dirY) / len;
 
       if (victim === player) {
-        const diInput = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+        const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
+        const diInput = (keys.has(p1Keys.moveRight) ? 1 : 0) - (keys.has(p1Keys.moveLeft) ? 1 : 0);
         if (diInput !== 0) {
           const diStrength = 0.25;
           const diAdjust = knockbackMagnitude * diStrength * diInput;
@@ -346,8 +364,13 @@ function updateHUD() {
       dummyDamageLabel.parentNode.firstChild.nodeValue = player.name + ": ";
       playerDamageLabel.parentNode.firstChild.nodeValue = player2.name + ": ";
     }
-    dummyDamageLabel.textContent = p1 + "%";
-    playerDamageLabel.textContent = p2 + "%";
+    function stockIcons(n) {
+      return "●".repeat(Math.max(0, Math.min(n, MAX_STOCKS)));
+    }
+    const p1StocksText = stockIcons(playerStocks);
+    const p2StocksText = stockIcons(player2Stocks);
+    dummyDamageLabel.textContent = `${p1StocksText} ${p1}%`;
+    playerDamageLabel.textContent = `${p2StocksText} ${p2}%`;
     function colorForDamage(val) {
       if (val < 60) return "#9dffde";
       if (val < 120) return "#ffe28a";
@@ -355,6 +378,15 @@ function updateHUD() {
     }
     dummyDamageLabel.style.color = colorForDamage(p1);
     playerDamageLabel.style.color = colorForDamage(p2);
+    function updateKillHint(el, val) {
+      if (val >= KILL_HINT_DAMAGE) {
+        el.style.textShadow = "0 0 8px rgba(255,107,107,0.9)";
+      } else {
+        el.style.textShadow = "none";
+      }
+    }
+    updateKillHint(dummyDamageLabel, p1);
+    updateKillHint(playerDamageLabel, p2);
   } else {
     const d = Math.round(dummy.damage), p = Math.round(player.damage);
     if (dummyDamageLabel.parentNode && dummyDamageLabel.parentNode.firstChild) {
@@ -447,8 +479,7 @@ function _initPractice() {
   updateHUD();
 }
 
-function startVersusMatch() {
-  gameState = GAME_STATE.VERSUS;
+function spawnVersusFighters() {
   player = createFighter({ x: playerStart.x, y: playerStart.y, w: 40, h: 70, color: "#3da1ff" });
   applyPlayerTypeTo(player, p1CharacterIndex);
   player.color = COLOR_PALETTE[p1ColorIndex % COLOR_PALETTE.length];
@@ -468,15 +499,33 @@ function startVersusMatch() {
   updateHUD();
 }
 
+function startVersusMatch() {
+  spawnVersusFighters();
+  gameState = GAME_STATE.VERSUS;
+}
+
+function goToVersusIntro() {
+  gameState = GAME_STATE.VERSUS_INTRO;
+  screenEnterTime = performance.now();
+}
+
 function goToTransition() {
   gameState = GAME_STATE.TRANSITION;
   transitionStartTime = performance.now();
+  spawnVersusFighters();
+}
+
+function toggleFullscreen() {
+  const el = document.getElementById("gameContainer");
+  if (!el) return;
+  if (document.fullscreenElement) document.exitFullscreen();
+  else el.requestFullscreen().catch(() => {});
 }
 
 function updateTransition(now) {
   const elapsed = now - transitionStartTime;
   if (elapsed >= TRANSITION_DURATION_MS) {
-    startVersusMatch();
+    gameState = GAME_STATE.VERSUS;
   }
 }
 
