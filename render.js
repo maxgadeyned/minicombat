@@ -92,6 +92,38 @@ function drawCharacterPortrait(archetype, color, x, y, size) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("?", 0, 0);
+  } else if (archetype === "vanguard") {
+    // Shield + sword icon
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.45, 0);
+    ctx.lineTo(-s * 0.1, -s * 0.4);
+    ctx.lineTo(-s * 0.1, s * 0.4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "rgba(244,241,222,0.95)";
+    ctx.fillRect(s * 0.05, -s * 0.45, s * 0.12, s * 0.9);
+    ctx.fillRect(-s * 0.08, -s * 0.1, s * 0.38, s * 0.14);
+  } else if (archetype === "blitz") {
+    // Lightning bolt
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.3, -s * 0.45);
+    ctx.lineTo(0, -s * 0.1);
+    ctx.lineTo(-s * 0.15, -s * 0.1);
+    ctx.lineTo(s * 0.3, s * 0.45);
+    ctx.lineTo(0, s * 0.1);
+    ctx.lineTo(s * 0.15, s * 0.1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (archetype === "shade") {
+    // Mask with shadow
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.05, s * 0.5, s * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(-s * 0.5, 0, s, s * 0.35);
   } else {
     ctx.beginPath();
     ctx.arc(0, 0, s * 0.35, 0, Math.PI * 2);
@@ -148,7 +180,7 @@ function drawMenu(now) {
   ctx.font = "20px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.65)";
   ctx.fillText("Choose mode", WORLD.width / 2, WORLD.height * 0.42);
-  const options = ["Local 2P Versus", "Practice (vs Dummy)", "Tutorial", "Settings"];
+  const options = ["Local 2P Versus", "Practice (vs Dummy)", "Tutorial", "Settings", "Credits"];
   const y = WORLD.height * 0.5;
   const lineHeight = 50;
   const pulse = 1 + 0.03 * Math.sin(now * 0.008);
@@ -177,7 +209,8 @@ function drawMenu(now) {
   ctx.font = "13px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.35)";
   ctx.textAlign = "center";
-  ctx.fillText("↑↓ Select  •  Enter / Space Confirm  •  Esc Back", WORLD.width / 2, WORLD.height * 0.78);
+  // Place navigation hint just below the last menu option (Credits).
+  ctx.fillText("↑↓ Select  •  Enter / Space Confirm  •  Esc Back", WORLD.width / 2, WORLD.height * 0.82);
   ctx.restore();
 }
 
@@ -209,7 +242,6 @@ function drawSettings(now) {
     { label: "Fullscreen", value: fullscreenOn ? "On" : "Off" },
     { label: "Music Volume", value: musicVolume + "%" },
     { label: "Effects Volume", value: effectsVolume + "%" },
-    { label: "Credits", value: "" },
   ];
   for (let i = 0; i < items.length; i++) {
     const isSel = i === settingsSelection;
@@ -402,7 +434,7 @@ function drawCharacterSelect(now) {
   drawTextWithShadow("CHARACTER SELECT", WORLD.width / 2, 52, "rgba(255,255,255,0.98)", "rgba(0,0,0,0.4)", 6);
   ctx.font = "15px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText("P1: 1 2 3  •  P2: Y U I  •  P1 color: Q E  •  P2 color: 7 9  •  Stage: 4 5 6  •  Enter / Esc", WORLD.width / 2, 88);
+  ctx.fillText("P1: 1–6  •  P2: Y U I O P [  •  P1 color: Q E  •  P2 color: 7 9  •  Stage: ← →  •  Enter / Esc", WORLD.width / 2, 88);
   ctx.font = "14px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.4)";
   ctx.fillText("Stage: " + STAGE_NAMES[stageIndex], WORLD.width / 2, 118);
@@ -416,12 +448,19 @@ function drawCharacterSelect(now) {
   const boxH = 142;
   const gap = 18;
   const totalW = 3 * boxW + 2 * gap;
+  const rowGap = 26;
   const elapsed = now - (screenEnterTime || now);
   const glow = 0.5 + 0.5 * Math.sin(now * 0.006);
-  for (let i = 0; i < 3; i++) {
-    const anim = Math.min(1, (elapsed - i * 100) / 250);
-    const x1 = p1x - totalW / 2 + i * (boxW + gap);
-    const x2 = p2x - totalW / 2 + i * (boxW + gap);
+  const count = PLAYER_TYPES.length;
+  const cols = 3;
+  for (let i = 0; i < count; i++) {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    const anim = Math.min(1, (elapsed - (row * cols + col) * 80) / 250);
+    const yOffset = row * (boxH + rowGap);
+    const yBox = boxY + yOffset;
+    const x1 = p1x - totalW / 2 + col * (boxW + gap);
+    const x2 = p2x - totalW / 2 + col * (boxW + gap);
     const isP1 = i === p1CharacterIndex;
     const isP2 = i === p2CharacterIndex;
     ctx.globalAlpha = 0.5 + 0.5 * anim;
@@ -435,17 +474,17 @@ function drawCharacterSelect(now) {
       ctx.lineWidth = 2;
     }
     ctx.fillStyle = (isP1 ? p1Color : PLAYER_TYPES[i].color) + "55";
-    roundRectPath(x1, boxY, boxW, boxH, 10);
+    roundRectPath(x1, yBox, boxW, boxH, 10);
     ctx.fill();
     ctx.strokeStyle = isP1 ? "#6bffb5" : "rgba(255,255,255,0.25)";
     ctx.lineWidth = isP1 ? 4 : 2;
     ctx.stroke();
     ctx.shadowBlur = 0;
-    drawCharacterPortrait(PLAYER_TYPES[i].archetype, isP1 ? p1Color : PLAYER_TYPES[i].color, x1 + boxW / 2, boxY + boxH / 2 - 20, 44);
+    drawCharacterPortrait(PLAYER_TYPES[i].archetype, isP1 ? p1Color : PLAYER_TYPES[i].color, x1 + boxW / 2, yBox + boxH / 2 - 20, 44);
     ctx.fillStyle = "rgba(255,255,255,0.95)";
     ctx.font = "bold 15px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(names[i], x1 + boxW / 2, boxY + boxH - 24);
+    ctx.fillText(names[i], x1 + boxW / 2, yBox + boxH - 24);
     if (isP2) {
       ctx.shadowColor = "#ffb347";
       ctx.shadowBlur = 12 * glow;
@@ -456,15 +495,15 @@ function drawCharacterSelect(now) {
       ctx.lineWidth = 2;
     }
     ctx.fillStyle = (isP2 ? p2Color : PLAYER_TYPES[i].color) + "55";
-    roundRectPath(x2, boxY, boxW, boxH, 10);
+    roundRectPath(x2, yBox, boxW, boxH, 10);
     ctx.fill();
     ctx.stroke();
     ctx.shadowBlur = 0;
-    drawCharacterPortrait(PLAYER_TYPES[i].archetype, isP2 ? p2Color : PLAYER_TYPES[i].color, x2 + boxW / 2, boxY + boxH / 2 - 20, 44);
+    drawCharacterPortrait(PLAYER_TYPES[i].archetype, isP2 ? p2Color : PLAYER_TYPES[i].color, x2 + boxW / 2, yBox + boxH / 2 - 20, 44);
     ctx.fillStyle = "rgba(255,255,255,0.95)";
     ctx.font = "bold 15px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(names[i], x2 + boxW / 2, boxY + boxH - 24);
+    ctx.fillText(names[i], x2 + boxW / 2, yBox + boxH - 24);
   }
   ctx.fillStyle = "#6bffb5";
   ctx.font = "bold 18px system-ui";
@@ -481,10 +520,7 @@ function drawCharacterSelect(now) {
   ctx.strokeStyle = "rgba(255,255,255,0.5)";
   ctx.lineWidth = 1;
   ctx.strokeRect(p2x + 52, 114, 18, 14);
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.font = "14px system-ui";
-  ctx.fillText(PLAYER_TYPES[p1CharacterIndex].label, p1x, boxY + boxH + 28);
-  ctx.fillText(PLAYER_TYPES[p2CharacterIndex].label, p2x, boxY + boxH + 28);
+  // Remove floating label text under characters to keep the grid clean.
   ctx.restore();
 }
 
@@ -596,23 +632,8 @@ function drawEntity(fighter, now) {
   const aabb = getAABB(fighter);
   ctx.save();
   const nowMs = now || performance.now();
-  if (roundOver && fighter === roundOverWinner && roundOverStartTime) {
-    const elapsed = (now || performance.now()) - roundOverStartTime;
-    const pulseDur = 800;
-    const t = Math.min(1, elapsed / pulseDur);
-    const scale = 1 + 0.15 * Math.sin(elapsed * 0.012) * (1 - t * 0.5);
-    const glowAlpha = 0.4 * (1 - t);
-    const cx = aabb.x + aabb.w / 2, cy = aabb.y + aabb.h / 2;
-    ctx.translate(cx, cy);
-    ctx.scale(scale, scale);
-    ctx.translate(-cx, -cy);
-    if (glowAlpha > 0) {
-      ctx.shadowColor = fighter.color;
-      ctx.shadowBlur = 20 + 10 * Math.sin(elapsed * 0.01);
-      ctx.globalAlpha = 1;
-    }
-  }
-  if (!roundOver && (fighter === player || fighter === player2) && fighter.invulnUntil && nowMs < fighter.invulnUntil) {
+  // No KO zoom; keep winner rendering simple and stable.
+  if (!roundOver && (fighter === player || fighter === player2) && fighter.invulnUntil && (!fighter.respawnAt || nowMs >= fighter.respawnAt) && nowMs < fighter.invulnUntil) {
     const t = Math.max(0, Math.min(1, (fighter.invulnUntil - nowMs) / RESPAWN_INVULN_MS));
     const pulse = 0.5 + 0.5 * Math.sin(nowMs * 0.02);
     ctx.globalAlpha = 0.6 + 0.3 * pulse;
@@ -620,13 +641,200 @@ function drawEntity(fighter, now) {
     ctx.shadowBlur = 18 * pulse * t;
   }
   if ((fighter === player || fighter === player2) && fighter.rollInvulnUntil && nowMs < fighter.rollInvulnUntil) ctx.globalAlpha = 0.4;
-  if (fighter.parryFlashUntil && nowMs < fighter.parryFlashUntil) {
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(aabb.x - 2, aabb.y - 2, aabb.w + 4, aabb.h + 4);
+  // Miniature toy fighter rendering
+  const cx = aabb.x + aabb.w / 2;
+  const baseRadius = aabb.w * 0.65 * 0.5;
+  const baseY = aabb.y + aabb.h;
+
+  // Base
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.75)";
+  ctx.beginPath();
+  ctx.ellipse(cx, baseY - 4, baseRadius, baseRadius * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Body parameters (miniature proportions: distinct torso + legs)
+  const bodyHeight = aabb.h * 0.68;
+  const bodyWidth = aabb.w * 0.6;
+  const bodyX = cx - bodyWidth / 2;
+  const bodyY = baseY - 4 - bodyHeight;
+  const headRadius = bodyWidth * 0.34;
+  const torsoHeight = bodyHeight * 0.7;
+  const legsHeight = bodyHeight - torsoHeight;
+  const legsY = bodyY + torsoHeight;
+  // Start torso slightly below the head so the head sits fully on top.
+  const torsoTop = bodyY + headRadius * 0.5;
+  const torsoBottom = legsY - 4;
+  const headCx = cx;
+  // Place head slightly above the torso so it doesn't sink into the body.
+  const headCy = torsoTop - headRadius * 0.1;
+
+  const arch = fighter.archetype || "archer";
+
+  // Common head
+  ctx.save();
+  ctx.fillStyle = "#1b1b25";
+  ctx.beginPath();
+  ctx.arc(headCx, headCy, headRadius, 0, Math.PI * 2);
+  ctx.fill();
+  // Simple head accents per archetype
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  if (arch === "archer") {
+    // Hood peak
+    ctx.beginPath();
+    ctx.moveTo(headCx, headCy - headRadius * 0.9);
+    ctx.lineTo(headCx - headRadius * 0.6, headCy - headRadius * 0.2);
+    ctx.lineTo(headCx + headRadius * 0.6, headCy - headRadius * 0.2);
+    ctx.closePath();
+    ctx.fill();
+  } else if (arch === "bruiser") {
+    // Headband
+    ctx.fillRect(headCx - headRadius, headCy - headRadius * 0.2, headRadius * 2, headRadius * 0.28);
+  } else if (arch === "mage") {
+    // Little hat
+    ctx.beginPath();
+    ctx.moveTo(headCx, headCy - headRadius * 1.1);
+    ctx.lineTo(headCx - headRadius * 0.7, headCy - headRadius * 0.2);
+    ctx.lineTo(headCx + headRadius * 0.7, headCy - headRadius * 0.2);
+    ctx.closePath();
+    ctx.fill();
+  } else if (arch === "vanguard") {
+    // Helmet stripe
+    ctx.fillRect(headCx - headRadius * 0.18, headCy - headRadius, headRadius * 0.36, headRadius * 1.8);
+  } else if (arch === "blitz") {
+    // Visor
+    ctx.fillRect(headCx - headRadius * 0.9, headCy - headRadius * 0.1, headRadius * 1.8, headRadius * 0.28);
+  } else if (arch === "shade") {
+    // Mask
+    ctx.fillRect(headCx - headRadius * 0.9, headCy + headRadius * 0.05, headRadius * 1.8, headRadius * 0.55);
   }
-  ctx.fillStyle = fighter.color;
-  ctx.fillRect(aabb.x, aabb.y, aabb.w, aabb.h);
+
+  // Per-archetype body/gear
+  if (arch === "archer") {
+    // Hood + quiver + bow (torso only)
+    ctx.fillStyle = fighter.color;
+    const hoodTop = torsoTop;
+    const hoodBottom = torsoBottom;
+    ctx.fillRect(bodyX, hoodTop, bodyWidth, hoodBottom - hoodTop);
+    // Hood trim
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(headCx, headCy, headRadius * 0.95, Math.PI * 0.2, Math.PI * 0.8);
+    ctx.stroke();
+    // Quiver
+    ctx.fillStyle = "#553b2f";
+    ctx.fillRect(bodyX - bodyWidth * 0.18, hoodTop + 6, bodyWidth * 0.18, (hoodBottom - hoodTop) * 0.7);
+    // Bow
+    ctx.strokeStyle = "#f4d35e";
+    ctx.lineWidth = 4;
+    const bowX = cx + bodyWidth * 0.55 * (fighter.facing >= 0 ? 1 : -1);
+    ctx.beginPath();
+    ctx.moveTo(bowX, hoodTop + (hoodBottom - hoodTop) * 0.1);
+    ctx.quadraticCurveTo(
+      bowX + (fighter.facing >= 0 ? -8 : 8),
+      hoodTop + (hoodBottom - hoodTop) * 0.5,
+      bowX,
+      hoodTop + (hoodBottom - hoodTop) * 0.9
+    );
+    ctx.stroke();
+  } else if (arch === "bruiser") {
+    // Chunky armor torso
+    ctx.fillStyle = fighter.color;
+    ctx.fillRect(bodyX, torsoTop, bodyWidth, torsoBottom - torsoTop);
+    // Belt
+    ctx.fillStyle = "#3b2f2f";
+    ctx.fillRect(bodyX, torsoBottom - 8, bodyWidth, 6);
+    // Fists
+    const fistW = bodyWidth * 0.32;
+    const fistH = torsoHeight * 0.4;
+    ctx.fillStyle = "#ffb347";
+    const leftFistX = bodyX - fistW * 0.55;
+    const rightFistX = bodyX + bodyWidth - fistW * 0.45;
+    const fistsY = torsoTop + (torsoBottom - torsoTop) * 0.45;
+    ctx.fillRect(leftFistX, fistsY, fistW, fistH);
+    ctx.fillRect(rightFistX, fistsY, fistW, fistH);
+  } else if (arch === "mage") {
+    // Robe
+    const robeTopY = torsoTop + 4;
+    const robeBottomY = baseY - 4;
+    ctx.fillStyle = fighter.color;
+    ctx.beginPath();
+    ctx.moveTo(cx - bodyWidth * 0.3, robeTopY);
+    ctx.lineTo(cx + bodyWidth * 0.3, robeTopY);
+    ctx.lineTo(cx + bodyWidth * 0.5, robeBottomY);
+    ctx.lineTo(cx - bodyWidth * 0.5, robeBottomY);
+    ctx.closePath();
+    ctx.fill();
+    // Floating orb
+    ctx.fillStyle = "#ffeb99";
+    ctx.beginPath();
+    ctx.arc(cx + bodyWidth * 0.55 * (fighter.facing >= 0 ? 1 : -1), robeTopY + 4, headRadius * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (arch === "vanguard") {
+    // Armor torso
+    ctx.fillStyle = fighter.color;
+    ctx.fillRect(bodyX, torsoTop, bodyWidth, torsoBottom - torsoTop);
+    // Chest plate
+    ctx.fillStyle = "#f4f1de";
+    ctx.fillRect(bodyX + bodyWidth * 0.2, torsoTop + 6, bodyWidth * 0.6, torsoHeight * 0.4);
+    // Sword
+    const swordDir = fighter.facing >= 0 ? 1 : -1;
+    const swordX = cx + bodyWidth * 0.55 * swordDir;
+    ctx.fillStyle = "#f4f1de";
+    ctx.fillRect(swordX - 3 * swordDir, torsoTop + 2, 6, torsoHeight * 0.9);
+    ctx.fillStyle = "#c44536";
+    ctx.fillRect(swordX - 8 * swordDir, torsoTop + torsoHeight * 0.4, 16, 6);
+  } else if (arch === "blitz") {
+    // Slim suit
+    ctx.fillStyle = fighter.color;
+    ctx.fillRect(bodyX + bodyWidth * 0.15, torsoTop, bodyWidth * 0.7, torsoBottom - torsoTop);
+    // Scarf
+    ctx.fillStyle = "#ffe28a";
+    const scarfY = torsoTop + 4;
+    ctx.fillRect(cx - bodyWidth * 0.3, scarfY, bodyWidth * 0.6, 6);
+    ctx.beginPath();
+    const tailDir = fighter.facing >= 0 ? -1 : 1;
+    ctx.moveTo(cx + tailDir * bodyWidth * 0.3, scarfY + 3);
+    ctx.lineTo(cx + tailDir * (bodyWidth * 0.5), scarfY + 14);
+    ctx.lineTo(cx + tailDir * (bodyWidth * 0.45), scarfY + 6);
+    ctx.closePath();
+    ctx.fill();
+  } else if (arch === "shade") {
+    // Cloak
+    const cloakTopY = torsoTop + 4;
+    const cloakBottomY = baseY - 4;
+    ctx.fillStyle = fighter.color;
+    ctx.beginPath();
+    ctx.moveTo(cx, cloakTopY);
+    ctx.lineTo(cx + bodyWidth * 0.5, cloakBottomY);
+    ctx.lineTo(cx - bodyWidth * 0.5, cloakBottomY);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    // Fallback: simple body
+    ctx.fillStyle = fighter.color;
+    ctx.fillRect(bodyX, bodyY, bodyWidth, torsoHeight);
+  }
+
+  // Simple face highlight
+  ctx.fillStyle = "rgba(255,255,255,0.16)";
+  ctx.beginPath();
+  ctx.arc(headCx - headRadius * 0.25, headCy - headRadius * 0.1, headRadius * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Generic legs for non-robed characters
+  if (arch === "archer" || arch === "bruiser" || arch === "vanguard" || arch === "blitz") {
+    const legW = bodyWidth * 0.22;
+    const gap = bodyWidth * 0.08;
+    const leftLegX = cx - legW - gap * 0.5;
+    const rightLegX = cx + gap * 0.5;
+    ctx.fillStyle = fighter.color;
+    ctx.fillRect(leftLegX, legsY, legW, legsHeight);
+    ctx.fillRect(rightLegX, legsY, legW, legsHeight);
+  }
+
   ctx.restore();
 }
 
@@ -760,37 +968,97 @@ function draw(now) {
   drawEffects(now);
   ctx.restore();
   if (tutorialMode) drawTutorialOverlay();
-  if (now < koFlashUntil) {
-    const remaining = koFlashUntil - now;
-    const alpha = Math.max(0, Math.min(1, remaining / KO_FLASH_MS));
-    ctx.save();
-    ctx.fillStyle = `rgba(255,255,255,${0.7 * alpha})`;
-    ctx.fillRect(0, 0, WORLD.width, WORLD.height);
-    ctx.restore();
-  }
   ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
-  ctx.font = "12px system-ui";
-  ctx.textAlign = "left";
-  const portraitSize = 20;
-  const textX = 44;
-  const row1Y = 22;
-  const row2Y = 42;
-  const playerState = now < player.stunnedUntil ? "HITSTUN" : now < player.rollingUntil ? "ROLL" : player.blocking ? "BLOCK" : player.onGround ? "GROUND" : "AIR";
   if (gameState === GAME_STATE.VERSUS && player2) {
-    drawCharacterPortrait(player.archetype, player.color, 12 + portraitSize / 2, row1Y, portraitSize);
-    ctx.fillText(`P1 ${player.name}: ${Math.round(player.damage)}%  Stocks: ${playerStocks}  ${playerState}`, textX, row1Y + 4);
-    const p2State = now < player2.stunnedUntil ? "HITSTUN" : now < player2.rollingUntil ? "ROLL" : player2.blocking ? "BLOCK" : player2.onGround ? "GROUND" : "AIR";
-    drawCharacterPortrait(player2.archetype, player2.color, 12 + portraitSize / 2, row2Y, portraitSize);
-    ctx.fillText(`P2 ${player2.name}: ${Math.round(player2.damage)}%  Stocks: ${player2Stocks}  ${p2State}`, textX, row2Y + 4);
+    const p1Damage = Math.round(player.damage);
+    const p2Damage = Math.round(player2.damage);
+    function damageColor(val) {
+      if (val < 60) return "#9dffde";
+      if (val < 120) return "#ffe28a";
+      return "#ff6b6b";
+    }
+    const pad = 24;
+    const topY = 22;
+    const portraitSize = 36;
+
+    // P1 HUD (left)
+    ctx.textAlign = "left";
+    drawCharacterPortrait(player.archetype, player.color, pad + portraitSize / 2, topY + portraitSize / 2, portraitSize);
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "bold 22px system-ui";
+    ctx.fillText(`P1 ${player.name}`, pad + portraitSize + 14, topY + 12);
+    ctx.font = "bold 30px system-ui";
+    ctx.fillStyle = damageColor(p1Damage);
+    ctx.fillText(`${p1Damage}%`, pad + portraitSize + 14, topY + 44);
+    ctx.font = "16px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    const p1StocksStr = "●".repeat(Math.max(0, Math.min(playerStocks, MAX_STOCKS)));
+    ctx.fillText(`Stocks: ${p1StocksStr}`, pad + portraitSize + 14, topY + 68);
+
+    // P2 HUD (right)
+    const rightPad = 24;
+    const rightX = WORLD.width - rightPad;
+    ctx.textAlign = "right";
+    drawCharacterPortrait(player2.archetype, player2.color, rightX - portraitSize / 2, topY + portraitSize / 2, portraitSize);
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "bold 22px system-ui";
+    ctx.fillText(`P2 ${player2.name}`, rightX - portraitSize - 14, topY + 12);
+    ctx.font = "bold 30px system-ui";
+    ctx.fillStyle = damageColor(p2Damage);
+    ctx.fillText(`${p2Damage}%`, rightX - portraitSize - 14, topY + 44);
+    ctx.font = "16px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    const p2StocksStr = "●".repeat(Math.max(0, Math.min(player2Stocks, MAX_STOCKS)));
+    ctx.fillText(`Stocks: ${p2StocksStr}`, rightX - portraitSize - 14, topY + 68);
   } else {
-    drawCharacterPortrait(player.archetype, player.color, 12 + portraitSize / 2, row1Y, portraitSize);
-    ctx.fillText(`P: ${Math.round(player.damage)}%  Stocks: ${playerStocks}  ${playerState}`, textX, row1Y + 4);
-    drawCharacterPortrait(dummy.archetype, dummy.color, 12 + portraitSize / 2, row2Y, portraitSize);
-    ctx.fillText(`D: ${Math.round(dummy.damage)}%  Stocks: ${dummyStocks}  ${dummy.onGround ? "GROUND" : "AIR"}`, textX, row2Y + 4);
-    ctx.fillText(`Dummy Mode (T): ${DUMMY_MODE_LABELS[dummyMode]}`, 12, 64);
+    // Practice / single-player HUD: same style, player vs dummy
+    const pDamage = Math.round(player.damage);
+    const dDamage = Math.round(dummy.damage);
+    function damageColor(val) {
+      if (val < 60) return "#9dffde";
+      if (val < 120) return "#ffe28a";
+      return "#ff6b6b";
+    }
+    const pad = 24;
+    const topY = 22;
+    const portraitSize = 36;
+
+    // Player HUD (left)
+    ctx.textAlign = "left";
+    drawCharacterPortrait(player.archetype, player.color, pad + portraitSize / 2, topY + portraitSize / 2, portraitSize);
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "bold 22px system-ui";
+    ctx.fillText(`Player ${player.name}`, pad + portraitSize + 14, topY + 12);
+    ctx.font = "bold 30px system-ui";
+    ctx.fillStyle = damageColor(pDamage);
+    ctx.fillText(`${pDamage}%`, pad + portraitSize + 14, topY + 44);
+    ctx.font = "16px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    const pStocksStr = "●".repeat(Math.max(0, Math.min(playerStocks, MAX_STOCKS)));
+    ctx.fillText(`Stocks: ${pStocksStr}`, pad + portraitSize + 14, topY + 68);
+
+    // Dummy HUD (right)
+    const rightPad = 24;
+    const rightX = WORLD.width - rightPad;
+    ctx.textAlign = "right";
+    drawCharacterPortrait(dummy.archetype, dummy.color, rightX - portraitSize / 2, topY + portraitSize / 2, portraitSize);
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "bold 22px system-ui";
+    ctx.fillText("Dummy", rightX - portraitSize - 14, topY + 12);
+    ctx.font = "bold 30px system-ui";
+    ctx.fillStyle = damageColor(dDamage);
+    ctx.fillText(`${dDamage}%`, rightX - portraitSize - 14, topY + 44);
+    ctx.font = "16px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    const dStocksStr = "●".repeat(Math.max(0, Math.min(dummyStocks, MAX_STOCKS)));
+    ctx.fillText(`Stocks: ${dStocksStr}`, rightX - portraitSize - 14, topY + 68);
+
+    // Dummy mode hint centered under HUD
+    ctx.textAlign = "center";
+    ctx.font = "13px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.fillText(`Dummy Mode (T): ${DUMMY_MODE_LABELS[dummyMode]}`, WORLD.width / 2, topY + 96);
   }
-  ctx.textAlign = "left";
   if (currentComboCount > 1 && now - lastComboHitTime <= COMBO_RESET_MS) {
     ctx.textAlign = "right";
     ctx.font = "bold 14px system-ui";

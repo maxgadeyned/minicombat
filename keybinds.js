@@ -15,8 +15,8 @@ const P2_KEYBINDS_DEFAULT = {
   block: "Quote",
 };
 
-const P1_SOLO_DEFAULT = { moveLeft: "KeyA", moveRight: "KeyD", jump: "Space", fastFall: "KeyS", dash: "KeyW", special: "KeyF", heavy: "KeyG", block: "KeyH" };
-const P1_LOCAL_DEFAULT = { moveLeft: "KeyA", moveRight: "KeyD", jump: "Space", fastFall: "KeyS", dash: "KeyW", special: "KeyX", heavy: "KeyC", block: "KeyV" };
+const P1_SOLO_DEFAULT = { moveLeft: "KeyA", moveRight: "KeyD", jump: "Space", fastFall: "KeyS", dash: "KeyQ", special: "KeyJ", heavy: "KeyK", block: "KeyL" };
+const P1_LOCAL_DEFAULT = { moveLeft: "KeyA", moveRight: "KeyD", jump: "Space", fastFall: "KeyS", dash: "KeyQ", special: "KeyX", heavy: "KeyC", block: "KeyV" };
 
 let p2Keybinds = { ...P2_KEYBINDS_DEFAULT };
 let p1SoloKeybinds = { ...P1_SOLO_DEFAULT };

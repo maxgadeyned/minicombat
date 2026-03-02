@@ -32,14 +32,24 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (gameState === GAME_STATE.MENU) {
-    if (e.code === "ArrowDown") { playSfx("menuSelect"); menuSelection = (menuSelection + 1) % 4; return; }
-    if (e.code === "ArrowUp") { playSfx("menuSelect"); menuSelection = (menuSelection - 1 + 4) % 4; return; }
+    const menuCount = 5;
+    if (e.code === "ArrowDown") { playSfx("menuSelect"); menuSelection = (menuSelection + 1) % menuCount; return; }
+    if (e.code === "ArrowUp") { playSfx("menuSelect"); menuSelection = (menuSelection - 1 + menuCount) % menuCount; return; }
     if (e.code === "Enter" || e.code === "Space") {
       playSfx("menuConfirm");
-      if (menuSelection === 0) { startTransition(GAME_STATE.VERSUS_SELECT); p1CharacterIndex = 0; p2CharacterIndex = 0; p1ColorIndex = 0; p2ColorIndex = 0; }
-      else if (menuSelection === 1) startPractice();
-      else if (menuSelection === 2) startTutorial();
-      else { startTransition(GAME_STATE.SETTINGS); settingsSelection = 0; }
+      if (menuSelection === 0) {
+        startTransition(GAME_STATE.VERSUS_SELECT);
+        p1CharacterIndex = 0; p2CharacterIndex = 0; p1ColorIndex = 0; p2ColorIndex = 0;
+      } else if (menuSelection === 1) {
+        startPractice();
+      } else if (menuSelection === 2) {
+        startTutorial();
+      } else if (menuSelection === 3) {
+        startTransition(GAME_STATE.SETTINGS);
+        settingsSelection = 0;
+      } else if (menuSelection === 4) {
+        startTransition(GAME_STATE.CREDITS);
+      }
     }
     return;
   }
@@ -50,7 +60,7 @@ window.addEventListener("keydown", (e) => {
       startTransition(GAME_STATE.MENU);
       return;
     }
-    const settingsCount = 6;
+    const settingsCount = 5;
     if (e.code === "ArrowDown") { playSfx("menuSelect"); settingsSelection = (settingsSelection + 1) % settingsCount; return; }
     if (e.code === "ArrowUp") { playSfx("menuSelect"); settingsSelection = (settingsSelection - 1 + settingsCount) % settingsCount; return; }
     if (e.code === "ArrowLeft") {
@@ -78,8 +88,6 @@ window.addEventListener("keydown", (e) => {
         p2SettingsFromSettings = true;
       } else if (settingsSelection === 2) {
         toggleFullscreen();
-      } else if (settingsSelection === 5) {
-        startTransition(GAME_STATE.CREDITS);
       }
     }
     return;
@@ -180,16 +188,21 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "Digit1") { playSfx("menuSelect"); p1CharacterIndex = 0; }
     if (e.code === "Digit2") { playSfx("menuSelect"); p1CharacterIndex = 1; }
     if (e.code === "Digit3") { playSfx("menuSelect"); p1CharacterIndex = 2; }
+    if (e.code === "Digit4") { playSfx("menuSelect"); p1CharacterIndex = 3; }
+    if (e.code === "Digit5") { playSfx("menuSelect"); p1CharacterIndex = 4; }
+    if (e.code === "Digit6") { playSfx("menuSelect"); p1CharacterIndex = 5; }
     if (e.code === "KeyY") { playSfx("menuSelect"); p2CharacterIndex = 0; }
     if (e.code === "KeyU") { playSfx("menuSelect"); p2CharacterIndex = 1; }
     if (e.code === "KeyI") { playSfx("menuSelect"); p2CharacterIndex = 2; }
+    if (e.code === "KeyO") { playSfx("menuSelect"); p2CharacterIndex = 3; }
+    if (e.code === "KeyP") { playSfx("menuSelect"); p2CharacterIndex = 4; }
+    if (e.code === "BracketLeft") { playSfx("menuSelect"); p2CharacterIndex = 5; }
     if (e.code === "KeyQ") { playSfx("menuSelect"); p1ColorIndex = (p1ColorIndex - 1 + COLOR_PALETTE.length) % COLOR_PALETTE.length; }
     if (e.code === "KeyE") { playSfx("menuSelect"); p1ColorIndex = (p1ColorIndex + 1) % COLOR_PALETTE.length; }
     if (e.code === "Digit7") { playSfx("menuSelect"); p2ColorIndex = (p2ColorIndex - 1 + COLOR_PALETTE.length) % COLOR_PALETTE.length; }
     if (e.code === "Digit9") { playSfx("menuSelect"); p2ColorIndex = (p2ColorIndex + 1) % COLOR_PALETTE.length; }
-    if (e.code === "Digit4") { playSfx("menuSelect"); stageIndex = 0; }
-    if (e.code === "Digit5") { playSfx("menuSelect"); stageIndex = 1; }
-    if (e.code === "Digit6") { playSfx("menuSelect"); stageIndex = 2; }
+    if (e.code === "ArrowLeft") { playSfx("menuSelect"); stageIndex = (stageIndex - 1 + STAGE_NAMES.length) % STAGE_NAMES.length; }
+    if (e.code === "ArrowRight") { playSfx("menuSelect"); stageIndex = (stageIndex + 1) % STAGE_NAMES.length; }
     if (e.code === "Enter" || e.code === "Space") { playSfx("menuConfirm"); goToVersusIntro(); }
     return;
   }

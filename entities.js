@@ -17,6 +17,7 @@ function createFighter(options) {
     stunnedUntil: 0,
     parryFlashUntil: 0,
     invulnUntil: 0,
+    respawnAt: 0,
     nextLightAt: 0,
     nextHeavyAt: 0,
     rollingUntil: 0,
@@ -52,6 +53,10 @@ const PLAYER_TYPES = [
   { label: "Archer", archetype: "archer", color: "#3da1ff", w: 40, h: 70, moveSpeed: MOVE_SPEED, firstJumpVel: FIRST_JUMP_VELOCITY, doubleJumpVel: DOUBLE_JUMP_VELOCITY, weight: 1.0 },
   { label: "Bruiser", archetype: "bruiser", color: "#ffb347", w: 48, h: 68, moveSpeed: MOVE_SPEED * 1.15, firstJumpVel: FIRST_JUMP_VELOCITY * 1.05, doubleJumpVel: DOUBLE_JUMP_VELOCITY * 1.0, weight: 1.2 },
   { label: "Mage", archetype: "mage", color: "#c678dd", w: 36, h: 74, moveSpeed: MOVE_SPEED * 0.9, firstJumpVel: FIRST_JUMP_VELOCITY * 1.1, doubleJumpVel: DOUBLE_JUMP_VELOCITY * 1.05, weight: 0.9 },
+  // New characters – currently accessible via Practice Z cycle
+  { label: "Vanguard", archetype: "vanguard", color: "#f4d35e", w: 44, h: 72, moveSpeed: MOVE_SPEED * 1.02, firstJumpVel: FIRST_JUMP_VELOCITY, doubleJumpVel: DOUBLE_JUMP_VELOCITY, weight: 1.05 },
+  { label: "Blitz", archetype: "blitz", color: "#ff6b6b", w: 38, h: 68, moveSpeed: MOVE_SPEED * 1.25, firstJumpVel: FIRST_JUMP_VELOCITY * 1.02, doubleJumpVel: DOUBLE_JUMP_VELOCITY * 1.05, weight: 0.85 },
+  { label: "Shade", archetype: "shade", color: "#6bffb5", w: 38, h: 72, moveSpeed: MOVE_SPEED * 1.12, firstJumpVel: FIRST_JUMP_VELOCITY * 1.05, doubleJumpVel: DOUBLE_JUMP_VELOCITY * 1.08, weight: 0.95 },
 ];
 
 const COLOR_PALETTE = [
@@ -71,6 +76,14 @@ function applyPlayerType(index) {
   if (type.color) player.color = type.color;
   if (type.w != null) player.size.w = type.w;
   if (type.h != null) player.size.h = type.h;
+  // When changing archetype in practice, snap the player back onto the platform
+  // so taller characters don't end up partially inside or below it.
+  player.pos.y = PLATFORM.y - player.size.h / 2;
+  player.prevPos.y = player.pos.y;
+  player.vel.y = 0;
+  player.onGround = true;
+  player.jumpsRemaining = 2;
+  player.lastJumpWasDouble = false;
 }
 
 function applyPlayerTypeTo(fighter, typeIndex) {

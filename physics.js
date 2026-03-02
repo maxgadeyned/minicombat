@@ -11,6 +11,8 @@ function getAABB(entity) {
 function integrateFighter(fighter, dt) {
   const nowMs = performance.now();
 
+  if (fighter.respawnAt && nowMs < fighter.respawnAt) return;
+
   fighter.prevPos.x = fighter.pos.x;
   fighter.prevPos.y = fighter.pos.y;
   const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
@@ -59,20 +61,28 @@ function integrateFighter(fighter, dt) {
 }
 
 function applyBlastZoneRespawn(fighter, isDummy) {
+  const nowMs = performance.now();
+  // Do not process blast-zone KOs while the fighter is invulnerable (respawn grace).
+  if (fighter.invulnUntil && nowMs < fighter.invulnUntil) return;
+
   const aabb = getAABB(fighter);
   const out = aabb.x + aabb.w < -BLAST_MARGIN || aabb.x > WORLD.width + BLAST_MARGIN || aabb.y > WORLD.height + BLAST_MARGIN || aabb.y + aabb.h < -BLAST_MARGIN;
   if (!out) return;
-  const nowMs = performance.now();
+  // nowMs already computed above
   if (!roundOver) {
     koSlowmoUntil = Math.max(koSlowmoUntil || 0, nowMs + KO_SLOWMO_MS);
     koFlashUntil = Math.max(koFlashUntil || 0, nowMs + KO_FLASH_MS);
-    shakeUntil = Math.max(shakeUntil, nowMs + 350);
-    shakeMagnitude = Math.max(shakeMagnitude, SHAKE_KO);
+    // Only apply big KO screen shake during Versus; Practice KOs keep slowmo/flash but no camera jitter.
+    if (gameState === GAME_STATE.VERSUS) {
+      shakeUntil = Math.max(shakeUntil, nowMs + 350);
+      shakeMagnitude = Math.max(shakeMagnitude, SHAKE_KO);
+    }
     playSfx("ko");
   }
   // Respawn at the center of the platform; they will fall in from above.
   const spawnX = PLATFORM.x + PLATFORM.width / 2;
   const spawnY = PLATFORM.y - fighter.size.h - 260;
+  const respawnAt = nowMs + RESPAWN_DELAY_MS;
 
   if (fighter === player2) {
     player2Stocks = Math.max(0, player2Stocks - 1);
@@ -81,7 +91,8 @@ function applyBlastZoneRespawn(fighter, isDummy) {
     fighter.prevPos.x = spawnX; fighter.prevPos.y = spawnY;
     fighter.vel.x = 0; fighter.vel.y = 0; fighter.damage = 0;
     fighter.jumpsRemaining = 2; fighter.lastJumpWasDouble = false;
-    fighter.invulnUntil = nowMs + RESPAWN_INVULN_MS;
+    fighter.respawnAt = respawnAt;
+    fighter.invulnUntil = respawnAt + RESPAWN_INVULN_MS;
     fighter.onGround = false;
     updateHUD();
   } else if (isDummy) {
@@ -91,7 +102,8 @@ function applyBlastZoneRespawn(fighter, isDummy) {
     fighter.prevPos.x = spawnX; fighter.prevPos.y = spawnY;
     fighter.vel.x = 0; fighter.vel.y = 0; fighter.damage = 0;
     fighter.jumpsRemaining = 2; fighter.lastJumpWasDouble = false;
-    fighter.invulnUntil = nowMs + RESPAWN_INVULN_MS;
+    fighter.respawnAt = respawnAt;
+    fighter.invulnUntil = respawnAt + RESPAWN_INVULN_MS;
     fighter.onGround = false;
     updateHUD();
   } else {
@@ -101,7 +113,8 @@ function applyBlastZoneRespawn(fighter, isDummy) {
     fighter.prevPos.x = spawnX; fighter.prevPos.y = spawnY;
     fighter.vel.x = 0; fighter.vel.y = 0; fighter.jumpsRemaining = 2; fighter.damage = 0;
     fighter.lastJumpWasDouble = false;
-    fighter.invulnUntil = nowMs + RESPAWN_INVULN_MS;
+    fighter.respawnAt = respawnAt;
+    fighter.invulnUntil = respawnAt + RESPAWN_INVULN_MS;
     fighter.onGround = false;
     updateHUD();
   }

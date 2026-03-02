@@ -28,6 +28,9 @@ function performSpecialFor(fighter, owner, input, now) {
   if (archetype === "archer") useArcherSpecial(fighter, owner, input, now);
   else if (archetype === "bruiser") useBruiserSpecial(fighter, owner, input, now);
   else if (archetype === "mage") useMageSpecial(fighter, owner, input, now);
+  else if (archetype === "vanguard") useVanguardSpecial(fighter, owner, input, now);
+  else if (archetype === "blitz") useBlitzSpecial(fighter, owner, input, now);
+  else if (archetype === "shade") useShadeSpecial(fighter, owner, input, now);
 }
 
 function pushSpecialHitboxFrom(attacker, owner, now, config) {
@@ -350,5 +353,216 @@ function useMageSpecial(fighter, owner, input, now) {
     vy: 0,
   });
   fighter.nextSpecialAt = now + 900;
+}
+
+// ---------- VANGUARD SPECIALS (midrange sword) ----------
+
+function useVanguardSpecial(fighter, owner, input, now) {
+  const dir = fighter.facing >= 0 ? 1 : -1;
+
+  // Air special: rising slash (defensive, light knockback)
+  if (input === "air") {
+    pushSpecialHitboxFrom(fighter, owner, now, {
+      w: 60,
+      h: 70,
+      offsetXFacing: fighter.size.w * 0.3,
+      useFacing: true,
+      offsetY: -fighter.size.h * 0.3,
+      kind: "light",
+      base: 260,
+      scaling: 1.8,
+      damage: 6,
+      dirY: -0.4,
+      lifetimeMs: 180,
+    });
+    fighter.nextSpecialAt = now + 900;
+    return;
+  }
+
+  // Down special: grounded thrust with extended range
+  if (input === "down") {
+    pushSpecialHitboxFrom(fighter, owner, now, {
+      w: 90,
+      h: 40,
+      offsetXFacing: fighter.size.w * 0.7,
+      useFacing: true,
+      offsetY: -fighter.size.h * 0.1,
+      kind: "light",
+      base: 280,
+      scaling: 2.0,
+      damage: 7,
+      dirY: -0.2,
+      lifetimeMs: 160,
+    });
+    fighter.nextSpecialAt = now + 1000;
+    return;
+  }
+
+  // Side special: shoulder dash slash
+  if (input === "right") {
+    const speed = 950;
+    pushSpecialHitboxFrom(fighter, owner, now, {
+      w: 70,
+      h: 50,
+      offsetXFacing: fighter.size.w * 0.6,
+      useFacing: true,
+      offsetY: -fighter.size.h * 0.15,
+      kind: "heavy",
+      base: 320,
+      scaling: 2.4,
+      damage: 8,
+      dirY: -0.25,
+      lifetimeMs: 180,
+      vx: dir * speed,
+      vy: 0,
+    });
+    fighter.nextSpecialAt = now + 1300;
+    return;
+  }
+
+  // Neutral: quick mid slash
+  pushSpecialHitboxFrom(fighter, owner, now, {
+    w: 60,
+    h: 50,
+    offsetXFacing: fighter.size.w * 0.5,
+    useFacing: true,
+    offsetY: -fighter.size.h * 0.2,
+    kind: "light",
+    base: 260,
+    scaling: 1.9,
+    damage: 6,
+    dirY: -0.15,
+    lifetimeMs: 140,
+  });
+  fighter.nextSpecialAt = now + 700;
+}
+
+// ---------- BLITZ SPECIALS (rushdown) ----------
+
+function useBlitzSpecial(fighter, owner, input, now) {
+  const dir = fighter.facing >= 0 ? 1 : -1;
+
+  // Air special: diagonal dive
+  if (input === "air") {
+    pushSpecialHitboxFrom(fighter, owner, now, {
+      w: 50,
+      h: 40,
+      offsetXFacing: fighter.size.w * 0.4,
+      useFacing: true,
+      offsetY: fighter.size.h * 0.2,
+      kind: "light",
+      base: 250,
+      scaling: 1.6,
+      damage: 5,
+      dirY: 0.7,
+      lifetimeMs: 200,
+      vx: dir * 600,
+      vy: 700,
+    });
+    fighter.nextSpecialAt = now + 1000;
+    return;
+  }
+
+  // Down special: momentum-cancel feint
+  if (input === "down") {
+    fighter.vel.x *= 0.3;
+    fighter.vel.y *= 0.3;
+    fighter.nextSpecialAt = now + 700;
+    return;
+  }
+
+  // Side special: fast dash slash
+  if (input === "right") {
+    const speed = 1100;
+    pushSpecialHitboxFrom(fighter, owner, now, {
+      w: 70,
+      h: 40,
+      offsetXFacing: fighter.size.w * 0.7,
+      useFacing: true,
+      offsetY: -fighter.size.h * 0.1,
+      kind: "light",
+      base: 260,
+      scaling: 2.0,
+      damage: 6,
+      dirY: 0,
+      lifetimeMs: 150,
+      vx: dir * speed,
+      vy: 0,
+    });
+    fighter.nextSpecialAt = now + 900;
+    return;
+  }
+
+  // Neutral: short afterimage dash without hitbox (reposition)
+  fighter.pos.x += dir * 60;
+  fighter.prevPos.x = fighter.pos.x;
+  fighter.nextSpecialAt = now + 600;
+}
+
+// ---------- SHADE SPECIALS (skirmisher) ----------
+
+function useShadeSpecial(fighter, owner, input, now) {
+  const dir = fighter.facing >= 0 ? 1 : -1;
+
+  // Air special: small AoE slash
+  if (input === "air") {
+    pushSpecialHitboxFrom(fighter, owner, now, {
+      w: 70,
+      h: 70,
+      offsetX: 0,
+      offsetY: -fighter.size.h * 0.1,
+      kind: "light",
+      base: 240,
+      scaling: 1.7,
+      damage: 5,
+      dirY: -0.1,
+      lifetimeMs: 180,
+    });
+    fighter.nextSpecialAt = now + 800;
+    return;
+  }
+
+  // Down special: brief cloak (no hitbox, visual only)
+  if (input === "down") {
+    fighter.rollInvulnUntil = now + 140;
+    fighter.rollingUntil = now + 140;
+    fighter.nextSpecialAt = now + 900;
+    return;
+  }
+
+  // Side special: quick forward slash with slightly extended range
+  if (input === "right") {
+    pushSpecialHitboxFrom(fighter, owner, now, {
+      w: 60,
+      h: 50,
+      offsetXFacing: fighter.size.w * 0.7,
+      useFacing: true,
+      offsetY: -fighter.size.h * 0.2,
+      kind: "light",
+      base: 240,
+      scaling: 1.8,
+      damage: 6,
+      dirY: -0.1,
+      lifetimeMs: 140,
+    });
+    fighter.nextSpecialAt = now + 750;
+    return;
+  }
+
+  // Neutral: short-range poke
+  pushSpecialHitboxFrom(fighter, owner, now, {
+    w: 50,
+    h: 40,
+    offsetXFacing: fighter.size.w * 0.5,
+    useFacing: true,
+    offsetY: -fighter.size.h * 0.1,
+    kind: "light",
+    base: 230,
+    scaling: 1.6,
+    damage: 5,
+    dirY: -0.1,
+    lifetimeMs: 120,
+  });
+  fighter.nextSpecialAt = now + 600;
 }
 

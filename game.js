@@ -256,8 +256,10 @@ function handleCombat(dt, now) {
         victim.parryFlashUntil = now + 150;
         attacker.stunnedUntil = Math.max(attacker.stunnedUntil, now + PARRY_STUN_ATTACKER_MS);
         hitstopUntil = Math.max(hitstopUntil, now + HITSTOP_PARRY_MS);
-        shakeUntil = Math.max(shakeUntil, now + 80);
-        shakeMagnitude = Math.max(shakeMagnitude, SHAKE_PARRY);
+        if (gameState === GAME_STATE.VERSUS) {
+          shakeUntil = Math.max(shakeUntil, now + 80);
+          shakeMagnitude = Math.max(shakeMagnitude, SHAKE_PARRY);
+        }
         hitEffects.push({ type: "text", text: "PARRY!", x: victim.pos.x, y: victim.pos.y - 50, createdAt: now, duration: 200 });
         playSfx("parry");
       } else if (canBlock && !isParry) {
@@ -336,8 +338,11 @@ function handleCombat(dt, now) {
 
       if ((victim.rollInvulnUntil || 0) > 0 && now < victim.rollInvulnUntil && now < (victim.rollingUntil || 0)) return;
       hitstopUntil = Math.max(hitstopUntil, now + (isLight ? HITSTOP_LIGHT_MS : HITSTOP_HEAVY_MS));
-      shakeUntil = Math.max(shakeUntil, now + 100);
-      shakeMagnitude = Math.max(shakeMagnitude, isLight ? SHAKE_LIGHT : SHAKE_HEAVY);
+      // Screen shake only during Versus (P1 vs P2) so Practice with the dummy never jitters.
+      if (gameState === GAME_STATE.VERSUS) {
+        shakeUntil = Math.max(shakeUntil, now + 100);
+        shakeMagnitude = Math.max(shakeMagnitude, isLight ? SHAKE_LIGHT : SHAKE_HEAVY);
+      }
       hitEffects.push({ type: "spark", x: victim.pos.x, y: victim.pos.y - victim.size.h * 0.3, createdAt: now, duration: 180, isHeavy: !isLight });
       hitEffects.push({ type: "arrow", x: victim.pos.x, y: victim.pos.y, angle: Math.atan2(vy, vx), createdAt: now, duration: 200 });
 

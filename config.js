@@ -21,8 +21,9 @@ const HORIZONTAL_DAMPING = 18;
 const BLAST_MARGIN = 200;
 
 const ATTACK_LIFETIME_MS = 100;
-const LIGHT = { base: 260, scaling: 2.0, damage: 5 };
-const HEAVY = { base: 380, scaling: 3.0, damage: 6 };
+// Slightly increased base knockback for basic attacks for a snappier feel.
+const LIGHT = { base: 280, scaling: 2.0, damage: 5 };
+const HEAVY = { base: 400, scaling: 3.0, damage: 6 };
 const VULNERABILITY_AT_100_LIGHT = 1.5;
 const VULNERABILITY_AT_100_HEAVY = 2.8;
 
