@@ -1,7 +1,7 @@
 "use strict";
 
-function performPlayerSpecial() {
-  const now = performance.now();
+function performPlayerSpecial(now) {
+  if (now == null) now = performance.now();
   if (now < (player.nextSpecialAt || 0)) return;
   const isAir = !player.onGround;
   const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
@@ -12,8 +12,8 @@ function performPlayerSpecial() {
   performSpecialFor(player, "player", input, now);
 }
 
-function performPlayer2Special() {
-  const now = performance.now();
+function performPlayer2Special(now) {
+  if (now == null) now = performance.now();
   if (!player2 || now < (player2.nextSpecialAt || 0)) return;
   const isAir = !player2.onGround;
   let input = "neutral";
@@ -24,6 +24,7 @@ function performPlayer2Special() {
 }
 
 function performSpecialFor(fighter, owner, input, now) {
+  if (now < (fighter.nextSpecialAt || 0)) return;
   const archetype = fighter.archetype || "archer";
   if (archetype === "archer") useArcherSpecial(fighter, owner, input, now);
   else if (archetype === "bruiser") useBruiserSpecial(fighter, owner, input, now);

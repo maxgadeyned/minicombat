@@ -8,15 +8,14 @@ function getAABB(entity) {
   return { x: entity.pos.x - entity.size.w / 2, y: entity.pos.y - entity.size.h / 2, w: entity.size.w, h: entity.size.h };
 }
 
-function integrateFighter(fighter, dt) {
-  const nowMs = performance.now();
+function integrateFighter(fighter, dt, nowMs) {
+  if (nowMs == null) nowMs = performance.now();
 
   if (fighter.respawnAt && nowMs < fighter.respawnAt) return;
 
   fighter.prevPos.x = fighter.pos.x;
   fighter.prevPos.y = fighter.pos.y;
-  const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
-  const fastFall = fighter.onGround ? false : (fighter === player2 ? keys.has(p2Keybinds.fastFall) : keys.has(p1Keys.fastFall));
+  const fastFall = fighter.onGround ? false : (fighter === player2 ? !!p2Held.fastFall : !!p1Held.fastFall);
   const gravityMult = fastFall ? FAST_FALL_MULTIPLIER : 1;
   fighter.vel.y += GRAVITY * gravityMult * dt;
   fighter.pos.x += fighter.vel.x * dt;
@@ -40,7 +39,7 @@ function integrateFighter(fighter, dt) {
     fighter.lastJumpWasDouble = false;
     if ((fighter === player || fighter === player2) && prevBottom < plat.y) {
       playSfx("land");
-      hitEffects.push({ type: "dust", x: fighter.pos.x, y: PLATFORM.y, createdAt: performance.now(), duration: 220 });
+      hitEffects.push({ type: "dust", x: fighter.pos.x, y: PLATFORM.y, createdAt: nowMs, duration: 220 });
     }
   }
 
@@ -60,8 +59,8 @@ function integrateFighter(fighter, dt) {
   }
 }
 
-function applyBlastZoneRespawn(fighter, isDummy) {
-  const nowMs = performance.now();
+function applyBlastZoneRespawn(fighter, isDummy, nowMs) {
+  if (nowMs == null) nowMs = performance.now();
   // Do not process blast-zone KOs while the fighter is invulnerable (respawn grace).
   if (fighter.invulnUntil && nowMs < fighter.invulnUntil) return;
 

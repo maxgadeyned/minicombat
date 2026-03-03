@@ -1,7 +1,29 @@
 "use strict";
 
-const GAME_STATE = { TITLE: "title", MENU: "menu", PRACTICE: "practice", VERSUS_SELECT: "versus_select", VERSUS_INTRO: "versus_intro", TRANSITION: "transition", VERSUS: "versus", P1_SETTINGS: "p1_settings", P2_SETTINGS: "p2_settings", SETTINGS: "settings", CREDITS: "credits" };
+const GAME_STATE = {
+  TITLE: "title",
+  MENU: "menu",
+  ONLINE_MENU: "online_menu",
+  ONLINE_LOBBY: "online_lobby",
+  PRACTICE: "practice",
+  VERSUS_SELECT: "versus_select",
+  VERSUS_INTRO: "versus_intro",
+  TRANSITION: "transition",
+  VERSUS: "versus",
+  P1_SETTINGS: "p1_settings",
+  P2_SETTINGS: "p2_settings",
+  SETTINGS: "settings",
+  CREDITS: "credits"
+};
 let gameState = GAME_STATE.TITLE;
+
+// ---------- SIM CLOCK (fixed step for determinism / rollback) ----------
+const SIM_FPS = 60;
+const SIM_DT = 1 / SIM_FPS;
+const SIM_FRAME_MS = 1000 / SIM_FPS;
+let simFrame = 0;
+function simNowMs() { return simFrame * SIM_FRAME_MS; }
+function resetSimClock() { simFrame = 0; }
 let screenEnterTime = 0;
 let transitionActive = false;
 let transitionPhase = "out";
@@ -44,6 +66,8 @@ function getTransitionOverlayAlpha() {
 }
 
 let menuSelection = 0;
+let onlineMenuSelection = 0;
+const DEFAULT_SIGNALING_URL = "ws://localhost:8787";
 let settingsSelection = 0;
 let p2SettingsSelection = 0;
 let p2SettingsFromSettings = false;
@@ -74,6 +98,9 @@ let roundOverStartTime = 0;
 let roundOverWinner = null;
 let gamePaused = false;
 let pauseMenuSelection = 0;
+let netDebugOverlay = false;
+let determinismTestMessage = null;
+let determinismTestMessageUntil = 0;
 let bestComboCount = 0, bestComboDamage = 0;
 const DUMMY_MODE_LABELS = ["PASSIVE", "ATTACK", "PARRY TRAIN"];
 let dummyMode = 1;
@@ -93,26 +120,340 @@ const TUTORIAL_STEPS = [
   { text: () => `Block with ${codeToDisplay(getP1Keybinds("solo").block)}`, done: () => player.blocking },
   { text: "Parry: block just before the dummy hits you!", done: () => hitEffects.some(e => e.type === "text" && e.text === "PARRY!") },
 ];
-let dummyNextAttackAt = performance.now() + 1000;
+let dummyNextAttackAt = 1000;
 let hitstopUntil = 0, shakeUntil = 0, shakeMagnitude = 0;
 let koSlowmoUntil = 0, koFlashUntil = 0;
 const hitEffects = [];
+
+function _cloneFighter(f) {
+  if (!f) return null;
+  return {
+    ...f,
+    pos: { ...f.pos },
+    prevPos: { ...f.prevPos },
+    vel: { ...f.vel },
+    size: { ...f.size },
+  };
+}
+
+function saveState() {
+  return {
+    simFrame,
+
+    // Entities
+    player: _cloneFighter(player),
+    player2: _cloneFighter(player2),
+    dummy: _cloneFighter(dummy),
+
+    // Global match state
+    playerStocks,
+    player2Stocks,
+    dummyStocks,
+    roundOver,
+    roundOverSelection,
+    roundOverStartTime,
+    roundOverWinner,
+    gamePaused,
+    pauseMenuSelection,
+    bestComboCount,
+    bestComboDamage,
+    currentComboCount,
+    currentComboDamage,
+    lastComboHitTime,
+    dummyMode,
+    dummyNextAttackAt,
+    tutorialMode,
+    tutorialStep,
+    tutorialMoveStartX,
+    tutorialJumpStartGround,
+    tutorialHeavyDone,
+    tutorialSpecialDone,
+    tutorialComplete,
+    tutorialCompleteAt,
+
+    // FX / hitstop
+    hitstopUntil,
+    shakeUntil,
+    shakeMagnitude,
+    koSlowmoUntil,
+    koFlashUntil,
+
+    // Deterministic input bookkeeping
+    p1InputBits,
+    p2InputBits,
+    p1PrevInputBits,
+    p2PrevInputBits,
+    p1LastJumpPressAt,
+    p2LastJumpPressAt,
+
+    // Collections
+    activeHitboxes: activeHitboxes.map(h => ({ ...h })),
+    hitEffects: hitEffects.map(e => ({ ...e })),
+  };
+}
+
+function loadState(state) {
+  simFrame = state.simFrame | 0;
+
+  player = _cloneFighter(state.player);
+  player2 = state.player2 ? _cloneFighter(state.player2) : null;
+  dummy = _cloneFighter(state.dummy);
+
+  playerStocks = state.playerStocks;
+  player2Stocks = state.player2Stocks;
+  dummyStocks = state.dummyStocks;
+  roundOver = state.roundOver;
+  roundOverSelection = state.roundOverSelection;
+  roundOverStartTime = state.roundOverStartTime;
+  roundOverWinner = state.roundOverWinner;
+  gamePaused = state.gamePaused;
+  pauseMenuSelection = state.pauseMenuSelection;
+  bestComboCount = state.bestComboCount;
+  bestComboDamage = state.bestComboDamage;
+  currentComboCount = state.currentComboCount;
+  currentComboDamage = state.currentComboDamage;
+  lastComboHitTime = state.lastComboHitTime;
+  dummyMode = state.dummyMode;
+  dummyNextAttackAt = state.dummyNextAttackAt;
+  tutorialMode = state.tutorialMode;
+  tutorialStep = state.tutorialStep;
+  tutorialMoveStartX = state.tutorialMoveStartX;
+  tutorialJumpStartGround = state.tutorialJumpStartGround;
+  tutorialHeavyDone = state.tutorialHeavyDone;
+  tutorialSpecialDone = state.tutorialSpecialDone;
+  tutorialComplete = state.tutorialComplete;
+  tutorialCompleteAt = state.tutorialCompleteAt;
+
+  hitstopUntil = state.hitstopUntil;
+  shakeUntil = state.shakeUntil;
+  shakeMagnitude = state.shakeMagnitude;
+  koSlowmoUntil = state.koSlowmoUntil;
+  koFlashUntil = state.koFlashUntil;
+
+  p1InputBits = state.p1InputBits | 0;
+  p2InputBits = state.p2InputBits | 0;
+  p1PrevInputBits = state.p1PrevInputBits | 0;
+  p2PrevInputBits = state.p2PrevInputBits | 0;
+  p1LastJumpPressAt = state.p1LastJumpPressAt;
+  p2LastJumpPressAt = state.p2LastJumpPressAt;
+
+  activeHitboxes.length = 0;
+  for (const hb of state.activeHitboxes) activeHitboxes.push({ ...hb });
+  hitEffects.length = 0;
+  for (const e of state.hitEffects) hitEffects.push({ ...e });
+}
+
+function runDeterminismSelfTest(framesToSimulate) {
+  const frames = framesToSimulate != null ? framesToSimulate | 0 : 240;
+  const start = saveState();
+  const startFrame = simFrame | 0;
+
+  // Deterministic pseudo-random input sequence (LCG).
+  let seed = 0xC0FFEE ^ (startFrame * 2654435761);
+  const seq = new Array(frames);
+  for (let i = 0; i < frames; i++) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    // Only allow a small subset of buttons to reduce chaos.
+    let bits = 0;
+    if (seed & 1) bits |= INPUT_BITS.LEFT;
+    if (seed & 2) bits |= INPUT_BITS.RIGHT;
+    if (seed & 4) bits |= INPUT_BITS.JUMP;
+    if (seed & 8) bits |= INPUT_BITS.FAST_FALL;
+    if (seed & 16) bits |= INPUT_BITS.DASH;
+    if (seed & 32) bits |= INPUT_BITS.BLOCK;
+    if (seed & 64) bits |= INPUT_BITS.SPECIAL;
+    if (seed & 128) bits |= INPUT_BITS.HEAVY;
+    // Never hold left+right.
+    if ((bits & INPUT_BITS.LEFT) && (bits & INPUT_BITS.RIGHT)) bits &= ~INPUT_BITS.RIGHT;
+    seq[i] = bits | 0;
+  }
+
+  const simulateSeq = () => {
+    for (let i = 0; i < frames; i++) {
+      const f = startFrame + i;
+      const now = f * SIM_FRAME_MS;
+      let dtScaled = SIM_DT;
+      if (now < koSlowmoUntil) dtScaled *= KO_SLOWMO_SCALE;
+      stepGameplay(dtScaled, now, seq[i], 0);
+      simFrame = f + 1;
+    }
+    return saveState();
+  };
+
+  let a, b, ok = false;
+  try {
+    a = simulateSeq();
+    loadState(start);
+    simFrame = startFrame;
+    b = simulateSeq();
+    ok = JSON.stringify(a) === JSON.stringify(b);
+  } catch (e) {
+    ok = false;
+    determinismTestMessage = "Determinism test error: " + (e && e.message ? e.message : String(e));
+    determinismTestMessageUntil = performance.now() + 3000;
+  } finally {
+    loadState(start);
+    simFrame = startFrame;
+  }
+
+  if (determinismTestMessage == null) {
+    determinismTestMessage = ok ? `Determinism OK (${frames} frames)` : `Determinism MISMATCH (${frames} frames)`;
+    determinismTestMessageUntil = performance.now() + 2500;
+  }
+}
+
+// ---------- PER-FRAME INPUT (deterministic) ----------
+const INPUT_BITS = {
+  LEFT: 1 << 0,
+  RIGHT: 1 << 1,
+  JUMP: 1 << 2,
+  FAST_FALL: 1 << 3,
+  DASH: 1 << 4,
+  BLOCK: 1 << 5,
+  SPECIAL: 1 << 6,
+  HEAVY: 1 << 7,
+};
+
+let p1InputBits = 0;
+let p2InputBits = 0;
+let p1PrevInputBits = 0;
+let p2PrevInputBits = 0;
+
+let p1Held = { left: false, right: false, jump: false, fastFall: false, dash: false, block: false, special: false, heavy: false };
+let p2Held = { left: false, right: false, jump: false, fastFall: false, dash: false, block: false, special: false, heavy: false };
+let p1Pressed = { jump: false, dash: false, block: false, special: false, heavy: false };
+let p2Pressed = { jump: false, dash: false, block: false, special: false, heavy: false };
+let p1JumpReleased = false;
+let p2JumpReleased = false;
+let p1LastJumpPressAt = 0;
+let p2LastJumpPressAt = 0;
+
+function _bitsFromKeysForP1(profile) {
+  const kb = getP1Keybinds(profile);
+  let bits = 0;
+  if (keys.has(kb.moveLeft)) bits |= INPUT_BITS.LEFT;
+  if (keys.has(kb.moveRight)) bits |= INPUT_BITS.RIGHT;
+  if (keys.has(kb.jump)) bits |= INPUT_BITS.JUMP;
+  if (keys.has(kb.fastFall)) bits |= INPUT_BITS.FAST_FALL;
+  if (keys.has(kb.dash)) bits |= INPUT_BITS.DASH;
+  if (keys.has(kb.block)) bits |= INPUT_BITS.BLOCK;
+  if (keys.has(kb.special)) bits |= INPUT_BITS.SPECIAL;
+  if (keys.has(kb.heavy)) bits |= INPUT_BITS.HEAVY;
+  return bits;
+}
+
+function _bitsFromKeysForP2() {
+  let bits = 0;
+  if (keys.has(p2Keybinds.moveLeft)) bits |= INPUT_BITS.LEFT;
+  if (keys.has(p2Keybinds.moveRight)) bits |= INPUT_BITS.RIGHT;
+  if (keys.has(p2Keybinds.jump)) bits |= INPUT_BITS.JUMP;
+  if (keys.has(p2Keybinds.fastFall)) bits |= INPUT_BITS.FAST_FALL;
+  if (keys.has(p2Keybinds.dash)) bits |= INPUT_BITS.DASH;
+  if (keys.has(p2Keybinds.block)) bits |= INPUT_BITS.BLOCK;
+  if (keys.has(p2Keybinds.special)) bits |= INPUT_BITS.SPECIAL;
+  if (keys.has(p2Keybinds.heavy)) bits |= INPUT_BITS.HEAVY;
+  return bits;
+}
+
+function applyInputBitsForSimFrame(p1Bits, p2Bits, now) {
+  p1InputBits = p1Bits | 0;
+  p2InputBits = p2Bits | 0;
+
+  p1JumpReleased = !(p1InputBits & INPUT_BITS.JUMP) && !!(p1PrevInputBits & INPUT_BITS.JUMP);
+  p2JumpReleased = !(p2InputBits & INPUT_BITS.JUMP) && !!(p2PrevInputBits & INPUT_BITS.JUMP);
+
+  p1Held = {
+    left: !!(p1InputBits & INPUT_BITS.LEFT),
+    right: !!(p1InputBits & INPUT_BITS.RIGHT),
+    jump: !!(p1InputBits & INPUT_BITS.JUMP),
+    fastFall: !!(p1InputBits & INPUT_BITS.FAST_FALL),
+    dash: !!(p1InputBits & INPUT_BITS.DASH),
+    block: !!(p1InputBits & INPUT_BITS.BLOCK),
+    special: !!(p1InputBits & INPUT_BITS.SPECIAL),
+    heavy: !!(p1InputBits & INPUT_BITS.HEAVY),
+  };
+  p2Held = {
+    left: !!(p2InputBits & INPUT_BITS.LEFT),
+    right: !!(p2InputBits & INPUT_BITS.RIGHT),
+    jump: !!(p2InputBits & INPUT_BITS.JUMP),
+    fastFall: !!(p2InputBits & INPUT_BITS.FAST_FALL),
+    dash: !!(p2InputBits & INPUT_BITS.DASH),
+    block: !!(p2InputBits & INPUT_BITS.BLOCK),
+    special: !!(p2InputBits & INPUT_BITS.SPECIAL),
+    heavy: !!(p2InputBits & INPUT_BITS.HEAVY),
+  };
+
+  p1Pressed = {
+    jump: !!(p1InputBits & INPUT_BITS.JUMP) && !(p1PrevInputBits & INPUT_BITS.JUMP),
+    dash: !!(p1InputBits & INPUT_BITS.DASH) && !(p1PrevInputBits & INPUT_BITS.DASH),
+    block: !!(p1InputBits & INPUT_BITS.BLOCK) && !(p1PrevInputBits & INPUT_BITS.BLOCK),
+    special: !!(p1InputBits & INPUT_BITS.SPECIAL) && !(p1PrevInputBits & INPUT_BITS.SPECIAL),
+    heavy: !!(p1InputBits & INPUT_BITS.HEAVY) && !(p1PrevInputBits & INPUT_BITS.HEAVY),
+  };
+  p2Pressed = {
+    jump: !!(p2InputBits & INPUT_BITS.JUMP) && !(p2PrevInputBits & INPUT_BITS.JUMP),
+    dash: !!(p2InputBits & INPUT_BITS.DASH) && !(p2PrevInputBits & INPUT_BITS.DASH),
+    block: !!(p2InputBits & INPUT_BITS.BLOCK) && !(p2PrevInputBits & INPUT_BITS.BLOCK),
+    special: !!(p2InputBits & INPUT_BITS.SPECIAL) && !(p2PrevInputBits & INPUT_BITS.SPECIAL),
+    heavy: !!(p2InputBits & INPUT_BITS.HEAVY) && !(p2PrevInputBits & INPUT_BITS.HEAVY),
+  };
+
+  if (p1Pressed.jump) p1LastJumpPressAt = now;
+  if (p2Pressed.jump) p2LastJumpPressAt = now;
+
+  p1PrevInputBits = p1InputBits;
+  p2PrevInputBits = p2InputBits;
+}
+
+function sampleInputsForSimFrame(now) {
+  const p1Profile = gameState === GAME_STATE.VERSUS ? "local" : "solo";
+  const p1Bits = _bitsFromKeysForP1(p1Profile);
+  const p2Bits = (gameState === GAME_STATE.VERSUS && player2) ? _bitsFromKeysForP2() : 0;
+  applyInputBitsForSimFrame(p1Bits, p2Bits, now);
+}
+
+function stepGameplay(dt, now, overrideP1Bits, overrideP2Bits) {
+  if (gameState !== GAME_STATE.PRACTICE && gameState !== GAME_STATE.VERSUS) return;
+  if (roundOver || gamePaused) return;
+
+  if (overrideP1Bits != null || overrideP2Bits != null) {
+    applyInputBitsForSimFrame(overrideP1Bits | 0, overrideP2Bits | 0, now);
+  } else {
+    sampleInputsForSimFrame(now);
+  }
+
+  handlePlayerInput(dt, now);
+  integrateFighter(player, dt, now);
+
+  if (gameState === GAME_STATE.VERSUS && player2) {
+    handlePlayer2Input(dt, now);
+    integrateFighter(player2, dt, now);
+    applyBlastZoneRespawn(player2, false, now);
+  } else {
+    integrateFighter(dummy, dt, now);
+    applyBlastZoneRespawn(dummy, true, now);
+    handleDummyAI(now);
+  }
+  resolvePlayerDummyCollision();
+  applyBlastZoneRespawn(player, false, now);
+  handleCombat(dt, now);
+  updateTutorial(now);
+}
 
 function handlePlayerInput(dt, now) {
   const inStun = now < player.stunnedUntil;
   const rolling = now < player.rollingUntil;
 
-  if (blockKeyJustPressed && player.onGround) {
+  player.blocking = !!p1Held.block;
+  if (p1Pressed.block && player.onGround) {
     if (now >= player.parryLockoutUntil) {
       player.parryWindowUntil = now + PARRY_WINDOW_MS;
       player.parryLockoutUntil = now + PARRY_LOCKOUT_MS;
     }
   }
-  blockKeyJustPressed = false;
 
-  const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
   let moveDir = 0;
-  if (!inStun) { if (keys.has(p1Keys.moveLeft)) moveDir -= 1; if (keys.has(p1Keys.moveRight)) moveDir += 1; }
+  if (!inStun) { if (p1Held.left) moveDir -= 1; if (p1Held.right) moveDir += 1; }
   const moveSpeed = player.moveSpeed || MOVE_SPEED;
 
   if (!rolling) {
@@ -124,22 +465,21 @@ function handlePlayerInput(dt, now) {
     }
   } else player.vel.x *= 0.98;
 
-  if (!inStun && !rolling && dashPressed && !player.onGround) {
+  if (!inStun && !rolling && p1Pressed.dash && !player.onGround) {
     const dir = moveDir !== 0 ? moveDir : player.facing;
     player.vel.x = DASH_SPEED * dir;
     player.rollingUntil = now + ROLL_DURATION_MS;
     player.rollInvulnUntil = now + ROLL_DURATION_MS * 0.7;
     player.onGround = false;
   }
-  dashPressed = false;
 
-  if (!inStun && jumpPressed && player.jumpsRemaining > 0) {
+  if (!inStun && p1Pressed.jump && player.jumpsRemaining > 0) {
     const isDoubleJump = player.jumpsRemaining === 1 && !player.onGround;
     if (isDoubleJump) {
       player.vel.y = player.doubleJumpVel || DOUBLE_JUMP_VELOCITY;
       player.lastJumpWasDouble = true;
     } else {
-      const timeSincePress = now - lastJumpPressAt;
+      const timeSincePress = now - p1LastJumpPressAt;
       const isShortHop = timeSincePress >= 0 && timeSincePress <= SHORT_HOP_MAX_MS;
       const fj = player.firstJumpVel || FIRST_JUMP_VELOCITY;
       player.vel.y = isShortHop ? fj * SHORT_HOP_MULT : fj;
@@ -149,7 +489,18 @@ function handlePlayerInput(dt, now) {
     player.jumpsRemaining -= 1;
     playSfx("jump");
   }
-  jumpPressed = false;
+  // Variable jump height cut on jump release.
+  if (p1JumpReleased && player && !player.lastJumpWasDouble && player.vel.y < 0) player.vel.y *= 0.5;
+
+  if (p1Pressed.special) {
+    const input = !player.onGround ? "air" : (p1Held.fastFall ? "down" : ((p1Held.left || p1Held.right) ? "right" : "neutral"));
+    performSpecialFor(player, "player", input, now);
+    if (tutorialMode && tutorialStep === 2) tutorialSpecialDone = true;
+  }
+  if (p1Pressed.heavy) {
+    spawnAttackFor(player, "player", "heavy", now);
+    if (tutorialMode && tutorialStep === 2) tutorialHeavyDone = true;
+  }
 }
 
 function handlePlayer2Input(dt, now) {
@@ -157,19 +508,16 @@ function handlePlayer2Input(dt, now) {
   const inStun = now < player2.stunnedUntil;
   const rolling = now < player2.rollingUntil;
 
-  if (blockKeyJustPressedP2 && player2.onGround) {
+  player2.blocking = !!p2Held.block;
+  if (p2Pressed.block && player2.onGround) {
     if (now >= player2.parryLockoutUntil) {
       player2.parryWindowUntil = now + PARRY_WINDOW_MS;
       player2.parryLockoutUntil = now + PARRY_LOCKOUT_MS;
     }
   }
-  blockKeyJustPressedP2 = false;
 
   let moveDir = 0;
-  if (!inStun) {
-    if (keys.has(p2Keybinds.moveLeft)) moveDir -= 1;
-    if (keys.has(p2Keybinds.moveRight)) moveDir += 1;
-  }
+  if (!inStun) { if (p2Held.left) moveDir -= 1; if (p2Held.right) moveDir += 1; }
   const moveSpeed = player2.moveSpeed || MOVE_SPEED;
 
   if (!rolling) {
@@ -183,22 +531,21 @@ function handlePlayer2Input(dt, now) {
     }
   } else player2.vel.x *= 0.98;
 
-  if (!inStun && !rolling && dashPressedP2 && !player2.onGround) {
+  if (!inStun && !rolling && p2Pressed.dash && !player2.onGround) {
     const dir = moveDir !== 0 ? moveDir : player2.facing;
     player2.vel.x = DASH_SPEED * dir;
     player2.rollingUntil = now + ROLL_DURATION_MS;
     player2.rollInvulnUntil = now + ROLL_DURATION_MS * 0.7;
     player2.onGround = false;
   }
-  dashPressedP2 = false;
 
-  if (!inStun && jumpPressedP2 && player2.jumpsRemaining > 0) {
+  if (!inStun && p2Pressed.jump && player2.jumpsRemaining > 0) {
     const isDoubleJump = player2.jumpsRemaining === 1 && !player2.onGround;
     if (isDoubleJump) {
       player2.vel.y = player2.doubleJumpVel || DOUBLE_JUMP_VELOCITY;
       player2.lastJumpWasDouble = true;
     } else {
-      const timeSincePress = now - lastJumpPressAtP2;
+      const timeSincePress = now - p2LastJumpPressAt;
       const isShortHop = timeSincePress >= 0 && timeSincePress <= SHORT_HOP_MAX_MS;
       const fj = player2.firstJumpVel || FIRST_JUMP_VELOCITY;
       player2.vel.y = isShortHop ? fj * SHORT_HOP_MULT : fj;
@@ -208,7 +555,13 @@ function handlePlayer2Input(dt, now) {
     player2.jumpsRemaining -= 1;
     playSfx("jump");
   }
-  jumpPressedP2 = false;
+  if (p2JumpReleased && player2 && !player2.lastJumpWasDouble && player2.vel.y < 0) player2.vel.y *= 0.5;
+
+  if (p2Pressed.special) {
+    const input = !player2.onGround ? "air" : (p2Held.fastFall ? "down" : ((p2Held.left || p2Held.right) ? "right" : "neutral"));
+    performSpecialFor(player2, "player2", input, now);
+  }
+  if (p2Pressed.heavy) spawnAttackFor(player2, "player2", "heavy", now);
 }
 
 function handleDummyAI(now) {
@@ -300,8 +653,7 @@ function handleCombat(dt, now) {
       let vy = (knockbackMagnitude * dirY) / len;
 
       if (victim === player) {
-        const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
-        const diInput = (keys.has(p1Keys.moveRight) ? 1 : 0) - (keys.has(p1Keys.moveLeft) ? 1 : 0);
+        const diInput = (p1Held.right ? 1 : 0) - (p1Held.left ? 1 : 0);
         if (diInput !== 0) {
           const diStrength = 0.25;
           const diAdjust = knockbackMagnitude * diStrength * diInput;
@@ -312,7 +664,7 @@ function handleCombat(dt, now) {
           vy = vy * scale;
         }
       } else if (victim === player2) {
-        const diInput = (keys.has(p2Keybinds.moveRight) ? 1 : 0) - (keys.has(p2Keybinds.moveLeft) ? 1 : 0);
+        const diInput = (p2Held.right ? 1 : 0) - (p2Held.left ? 1 : 0);
         if (diInput !== 0) {
           const diStrength = 0.25;
           const diAdjust = knockbackMagnitude * diStrength * diInput;
@@ -454,6 +806,14 @@ function startTutorial() {
 }
 
 function _initPractice() {
+  resetSimClock();
+  // Sync input "prev" to current keys so we don't block first press (stale prev from menu/previous session).
+  const p1Bits = _bitsFromKeysForP1("solo");
+  p1InputBits = p1Bits | 0;
+  p1PrevInputBits = p1Bits | 0;
+  p2InputBits = 0;
+  p2PrevInputBits = 0;
+
   player = createFighter({ x: playerStart.x, y: playerStart.y, w: 40, h: 70, color: "#3da1ff" });
   playerTypeIndex = 0;
   applyPlayerType(playerTypeIndex);
@@ -481,10 +841,12 @@ function _initPractice() {
     tutorialSpecialDone = false;
     dummyMode = tutorialStep >= 4 ? 2 : 0;
   }
+  dummyNextAttackAt = simNowMs() + 1000;
   updateHUD();
 }
 
 function spawnVersusFighters() {
+  resetSimClock();
   player = createFighter({ x: playerStart.x, y: playerStart.y, w: 40, h: 70, color: "#3da1ff" });
   applyPlayerTypeTo(player, p1CharacterIndex);
   player.color = COLOR_PALETTE[p1ColorIndex % COLOR_PALETTE.length];
@@ -507,6 +869,13 @@ function spawnVersusFighters() {
 function startVersusMatch() {
   spawnVersusFighters();
   gameState = GAME_STATE.VERSUS;
+  // Sync input prev to current keys so first press after match start isn't lost (stale prev from menus).
+  const p1B = _bitsFromKeysForP1("local");
+  const p2B = player2 ? _bitsFromKeysForP2() : 0;
+  p1InputBits = p1B | 0;
+  p1PrevInputBits = p1B | 0;
+  p2InputBits = p2B | 0;
+  p2PrevInputBits = p2B | 0;
 }
 
 function goToVersusIntro() {

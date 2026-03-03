@@ -180,7 +180,7 @@ function drawMenu(now) {
   ctx.font = "20px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.65)";
   ctx.fillText("Choose mode", WORLD.width / 2, WORLD.height * 0.42);
-  const options = ["Local 2P Versus", "Practice (vs Dummy)", "Tutorial", "Settings", "Credits"];
+  const options = ["Local 2P Versus", "Online Versus (room code)", "Practice (vs Dummy)", "Tutorial", "Settings", "Credits"];
   const y = WORLD.height * 0.5;
   const lineHeight = 50;
   const pulse = 1 + 0.03 * Math.sin(now * 0.008);
@@ -211,6 +211,104 @@ function drawMenu(now) {
   ctx.textAlign = "center";
   // Place navigation hint just below the last menu option (Credits).
   ctx.fillText("↑↓ Select  •  Enter / Space Confirm  •  Esc Back", WORLD.width / 2, WORLD.height * 0.82);
+  ctx.restore();
+}
+
+function drawOnlineMenu(now) {
+  clear();
+  ctx.save();
+  const t = now * 0.00025;
+  const grad = ctx.createLinearGradient(WORLD.width * 0.25 * Math.sin(t), 0, WORLD.width, WORLD.height);
+  grad.addColorStop(0, "#141428");
+  grad.addColorStop(1, "#0f3460");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  fillRoundedRect(WORLD.width * 0.18, WORLD.height * 0.2, WORLD.width * 0.64, 420, 16);
+
+  ctx.textAlign = "center";
+  ctx.font = "bold 36px system-ui";
+  drawTextWithShadow("ONLINE VERSUS", WORLD.width / 2, 120, "rgba(255,255,255,0.95)", "rgba(0,0,0,0.5)", 6);
+  ctx.font = "16px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillText("Host a room code or join one (WebRTC P2P)", WORLD.width / 2, 155);
+
+  const options = ["Host room", "Join room", "Back"];
+  const startY = 240;
+  const lineH = 56;
+  const pulse = 1 + 0.03 * Math.sin(now * 0.008);
+  for (let i = 0; i < options.length; i++) {
+    const isSel = i === onlineMenuSelection;
+    ctx.save();
+    if (isSel) {
+      ctx.translate(WORLD.width / 2, startY + i * lineH);
+      ctx.scale(pulse, pulse);
+      ctx.translate(-WORLD.width / 2, -(startY + i * lineH));
+    }
+    ctx.fillStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.65)";
+    ctx.font = isSel ? "bold 26px system-ui" : "22px system-ui";
+    if (isSel) drawTextWithShadow(options[i], WORLD.width / 2, startY + i * lineH, "#6bffb5", "rgba(0,0,0,0.35)", 4);
+    else ctx.fillText(options[i], WORLD.width / 2, startY + i * lineH);
+    ctx.restore();
+  }
+
+  ctx.font = "13px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillText("↑↓ Select  •  Enter / Space Confirm  •  Esc Back", WORLD.width / 2, WORLD.height * 0.82);
+  ctx.restore();
+}
+
+function drawOnlineLobby(now) {
+  clear();
+  ctx.save();
+  const t = now * 0.0002;
+  const grad = ctx.createLinearGradient(WORLD.width * 0.25 * Math.sin(t), 0, WORLD.width, WORLD.height);
+  grad.addColorStop(0, "#101021");
+  grad.addColorStop(1, "#16213e");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  fillRoundedRect(WORLD.width * 0.16, WORLD.height * 0.22, WORLD.width * 0.68, 360, 16);
+
+  const stats = typeof netcodeGetStats === "function" ? netcodeGetStats() : null;
+  const role = stats && stats.role ? stats.role : "—";
+  const state = stats && stats.connectionState ? stats.connectionState : "—";
+  const code = stats && stats.roomCode ? stats.roomCode : null;
+  const err = stats && stats.lastError ? stats.lastError : null;
+
+  ctx.textAlign = "center";
+  ctx.font = "bold 34px system-ui";
+  drawTextWithShadow("ONLINE LOBBY", WORLD.width / 2, 130, "rgba(255,255,255,0.95)", "rgba(0,0,0,0.45)", 6);
+
+  ctx.font = "18px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillText("Role: " + role.toUpperCase(), WORLD.width / 2, 185);
+  ctx.fillText("Status: " + state, WORLD.width / 2, 215);
+
+  if (code) {
+    ctx.font = "bold 42px system-ui";
+    ctx.fillStyle = "#6bffb5";
+    drawTextWithShadow(code, WORLD.width / 2, 290, "#6bffb5", "rgba(0,0,0,0.4)", 6);
+    ctx.font = "16px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillText("Share this room code with your opponent", WORLD.width / 2, 325);
+  } else {
+    ctx.font = "16px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillText("Waiting for room code / connection…", WORLD.width / 2, 300);
+  }
+
+  if (err) {
+    ctx.font = "14px system-ui";
+    ctx.fillStyle = "rgba(255,120,120,0.9)";
+    ctx.fillText(err, WORLD.width / 2, 370);
+  }
+
+  ctx.font = "13px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillText("Esc Back (disconnect)", WORLD.width / 2, WORLD.height * 0.82);
   ctx.restore();
 }
 
@@ -964,8 +1062,9 @@ function draw(now) {
   drawEntity(player, now);
   if (gameState === GAME_STATE.VERSUS && player2) drawEntity(player2, now);
   else drawEntity(dummy, now);
-  drawHitboxes(now);
-  drawEffects(now);
+  const gameTime = (gameState === GAME_STATE.VERSUS || gameState === GAME_STATE.PRACTICE) && typeof simNowMs === "function" ? simNowMs() : now;
+  drawHitboxes(gameTime);
+  drawEffects(gameTime);
   ctx.restore();
   if (tutorialMode) drawTutorialOverlay();
   ctx.save();
@@ -1063,6 +1162,39 @@ function draw(now) {
     ctx.textAlign = "right";
     ctx.font = "bold 14px system-ui";
     ctx.fillText(`${currentComboCount} HIT  /  ${Math.round(currentComboDamage)}%`, WORLD.width - 16, 24);
+  }
+  if (netDebugOverlay && typeof netcodeGetStats === "function") {
+    const s = netcodeGetStats();
+    if (s && s.enabled) {
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      fillRoundedRect(12, WORLD.height - 110, 420, 96, 10);
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      ctx.textAlign = "left";
+      const behind = s.lastRemoteFrame >= 0 && simFrame < s.lastRemoteFrame ? ((s.lastRemoteFrame - simFrame) / 60).toFixed(1) : null;
+      const ahead = s.lastRemoteFrame >= 0 && simFrame > s.lastRemoteFrame ? ((simFrame - s.lastRemoteFrame) / 60).toFixed(1) : null;
+      const delayStr = behind != null ? `YOU BEHIND ~${behind}s` : (ahead != null ? `you ahead ~${ahead}s` : "");
+      const lines = [
+        `net: ${s.connectionState || "?"}  role: ${(s.role || "?").toUpperCase()}  room: ${s.roomCode || "-"}`,
+        `frame: ${simFrame}  remoteLast: ${s.lastRemoteFrame}  recv: ${s.receivedInputCount != null ? s.receivedInputCount : "-"}  ${delayStr}`,
+        `rollbacks: ${s.rollbackCount}  lastFrom: ${s.lastRollbackFromFrame}`,
+        `Keep game window in focus (no minimize/alt-tab) to avoid huge delay.`,
+      ];
+      for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], 24, WORLD.height - 86 + i * 18);
+      ctx.restore();
+    }
+  }
+  if (determinismTestMessage && performance.now() < determinismTestMessageUntil) {
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.font = "bold 14px system-ui";
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    fillRoundedRect(WORLD.width / 2 - 170, 86, 340, 28, 10);
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fillText(determinismTestMessage, WORLD.width / 2, 106);
+    ctx.restore();
   }
   if (gamePaused) {
     ctx.fillStyle = "rgba(0,0,0,0.6)";

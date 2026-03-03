@@ -4,7 +4,7 @@ const activeHitboxes = [];
 
 function spawnAttackFor(attacker, owner, kind) {
   const config = kind === "heavy" ? HEAVY : LIGHT;
-  const now = performance.now();
+  const now = (arguments.length >= 4 && arguments[3] != null) ? arguments[3] : performance.now();
   if (now < attacker.stunnedUntil) return;
   if (kind === "light" && now < attacker.nextLightAt) return;
   if (kind === "heavy" && now < attacker.nextHeavyAt) return;
@@ -18,8 +18,7 @@ function spawnAttackFor(attacker, owner, kind) {
   } else {
     if (kind === "light") { w = 70; h = 40; offsetX = attacker.size.w / 2 + w / 2 + 4; offsetY = 0; dirY = -0.1; }
     else {
-      const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
-      const isPlayerDownHeavy = (owner === "player" && keys.has(p1Keys.fastFall)) || (owner === "player2" && keys.has(p2Keybinds.fastFall));
+      const isPlayerDownHeavy = (owner === "player" && p1Held.fastFall) || (owner === "player2" && p2Held.fastFall);
       if (isPlayerDownHeavy) { w = 55; h = 50; offsetX = 0; offsetY = attacker.size.h / 2 + h / 2 + 4; dirY = 1; }
       else { w = 75; h = 45; offsetX = attacker.size.w / 2 + w / 2 + 4; offsetY = -attacker.size.h * 0.1; dirY = -0.35; }
     }
@@ -35,5 +34,5 @@ function spawnAttackFor(attacker, owner, kind) {
   else attacker.nextHeavyAt = now + HEAVY_COOLDOWN_MS;
 }
 
-function spawnAttack(kind) { spawnAttackFor(player, "player", kind); }
+function spawnAttack(kind, nowMs) { spawnAttackFor(player, "player", kind, nowMs); }
 

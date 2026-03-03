@@ -1,17 +1,8 @@
 "use strict";
 
 // ---------- INPUT ----------
+// Raw keyboard state. Gameplay input is sampled deterministically per sim frame in `game.js`.
 const keys = new Set();
-let spaceHeld = false;
-let jumpPressed = false;
-let blockKeyJustPressed = false;
-let dashPressed = false;
-let lastJumpPressAt = 0;
-
-let jumpPressedP2 = false;
-let blockKeyJustPressedP2 = false;
-let dashPressedP2 = false;
-let lastJumpPressAtP2 = 0;
 
 
 window.addEventListener("keydown", (e) => {
@@ -24,6 +15,12 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   keys.add(e.code);
+  if (e.code === "KeyN" && p1RebindingAction === null && p2RebindingAction === null) {
+    netDebugOverlay = !netDebugOverlay;
+  }
+  if (e.code === "KeyP" && p1RebindingAction === null && p2RebindingAction === null) {
+    if (gameState === GAME_STATE.VERSUS && (!netcodeIsEnabled || !netcodeIsEnabled())) runDeterminismSelfTest(240);
+  }
 
   if (gameState === GAME_STATE.TITLE) {
     playSfx("menuConfirm");
@@ -32,7 +29,7 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (gameState === GAME_STATE.MENU) {
-    const menuCount = 5;
+    const menuCount = 6;
     if (e.code === "ArrowDown") { playSfx("menuSelect"); menuSelection = (menuSelection + 1) % menuCount; return; }
     if (e.code === "ArrowUp") { playSfx("menuSelect"); menuSelection = (menuSelection - 1 + menuCount) % menuCount; return; }
     if (e.code === "Enter" || e.code === "Space") {
@@ -41,17 +38,58 @@ window.addEventListener("keydown", (e) => {
         startTransition(GAME_STATE.VERSUS_SELECT);
         p1CharacterIndex = 0; p2CharacterIndex = 0; p1ColorIndex = 0; p2ColorIndex = 0;
       } else if (menuSelection === 1) {
-        startPractice();
+        startTransition(GAME_STATE.ONLINE_MENU);
+        onlineMenuSelection = 0;
       } else if (menuSelection === 2) {
-        startTutorial();
+        startPractice();
       } else if (menuSelection === 3) {
+        startTutorial();
+      } else if (menuSelection === 4) {
         startTransition(GAME_STATE.SETTINGS);
         settingsSelection = 0;
-      } else if (menuSelection === 4) {
+      } else if (menuSelection === 5) {
         startTransition(GAME_STATE.CREDITS);
       }
     }
     return;
+  }
+
+  if (gameState === GAME_STATE.ONLINE_MENU) {
+    const menuCount = 3;
+    if (e.code === "Escape" || e.code === "Backspace") { playSfx("menuBack"); startTransition(GAME_STATE.MENU); return; }
+    if (e.code === "ArrowDown") { playSfx("menuSelect"); onlineMenuSelection = (onlineMenuSelection + 1) % menuCount; return; }
+    if (e.code === "ArrowUp") { playSfx("menuSelect"); onlineMenuSelection = (onlineMenuSelection - 1 + menuCount) % menuCount; return; }
+    if (e.code === "Enter" || e.code === "Space") {
+      playSfx("menuConfirm");
+      if (onlineMenuSelection === 0) {
+        gameState = GAME_STATE.ONLINE_LOBBY;
+        screenEnterTime = performance.now();
+        // Host always connects to local server; joiner uses DEFAULT_SIGNALING_URL (your public IP).
+        netOnlineHost("ws://localhost:8787");
+      } else if (onlineMenuSelection === 1) {
+        const code = prompt("Enter room code") || "";
+        if (code.trim()) {
+          gameState = GAME_STATE.ONLINE_LOBBY;
+          screenEnterTime = performance.now();
+          netOnlineJoin(DEFAULT_SIGNALING_URL, code.trim());
+        } else {
+          playSfx("menuBack");
+        }
+      } else {
+        playSfx("menuBack");
+        startTransition(GAME_STATE.MENU);
+      }
+    }
+    return;
+  }
+
+  if (gameState === GAME_STATE.ONLINE_LOBBY) {
+    if (e.code === "Escape" || e.code === "Backspace") {
+      playSfx("menuBack");
+      netOnlineDisconnect();
+      startTransition(GAME_STATE.MENU);
+      return;
+    }
   }
 
   if (gameState === GAME_STATE.SETTINGS) {
@@ -251,28 +289,6 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
-  if (gameState === GAME_STATE.VERSUS && player2 && isP2Key(e)) {
-    if (e.code === p2Keybinds.jump) {
-      lastJumpPressAtP2 = performance.now();
-      jumpPressedP2 = true;
-    }
-    if (e.code === p2Keybinds.dash) dashPressedP2 = true;
-    if (e.code === p2Keybinds.special) performPlayer2Special();
-    if (e.code === p2Keybinds.heavy) spawnAttackFor(player2, "player2", "heavy");
-    if (e.code === p2Keybinds.block) { blockKeyJustPressedP2 = true; player2.blocking = true; }
-    return;
-  }
-
-  const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
-  const isP1Key = e.code === p1Keys.moveLeft || e.code === p1Keys.moveRight || e.code === p1Keys.jump || e.code === p1Keys.fastFall || e.code === p1Keys.dash || e.code === p1Keys.special || e.code === p1Keys.heavy || e.code === p1Keys.block;
-  if (isP1Key) e.preventDefault();
-  if (e.code === p1Keys.jump) {
-    lastJumpPressAt = performance.now();
-    if (!spaceHeld) jumpPressed = true;
-    spaceHeld = true;
-  }
-  if (e.code === p1Keys.block) { blockKeyJustPressed = true; player.blocking = true; }
-  if (e.code === p1Keys.dash) dashPressed = true;
   if (gameState === GAME_STATE.PRACTICE) {
     if (e.code === "KeyZ") applyPlayerType(playerTypeIndex + 1);
     if (e.code === "Digit1") { playerTypeIndex = 0; hardReset(); }
@@ -281,23 +297,11 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "KeyT") dummyMode = (dummyMode + 1) % DUMMY_MODE_LABELS.length;
   }
   if (e.code === "Escape") { gamePaused = true; pauseMenuSelection = 0; return; }
-  if (e.code === p1Keys.special) { performPlayerSpecial(); if (tutorialMode && tutorialStep === 2) tutorialSpecialDone = true; }
-  else if (e.code === p1Keys.heavy) { spawnAttack("heavy"); if (tutorialMode && tutorialStep === 2) tutorialHeavyDone = true; }
   if (e.code === "KeyR") { if (gameState === GAME_STATE.VERSUS && roundOver) return; hardReset(); }
 });
 
 window.addEventListener("keyup", (e) => {
   keys.delete(e.code);
-  if (player && (gameState === GAME_STATE.PRACTICE || gameState === GAME_STATE.VERSUS)) {
-    const p1Keys = getP1Keybinds(gameState === GAME_STATE.VERSUS ? "local" : "solo");
-    if (e.code === p1Keys.block) player.blocking = false;
-    if (e.code === p1Keys.jump) {
-      spaceHeld = false;
-      if (!player.lastJumpWasDouble && player.vel.y < 0) player.vel.y *= 0.5;
-    }
-  }
-  if (player2 && e.code === p2Keybinds.block) player2.blocking = false;
-  if (player2 && e.code === p2Keybinds.jump && player2.vel.y < 0 && !player2.lastJumpWasDouble) player2.vel.y *= 0.5;
 });
 
 window.addEventListener("click", () => {
