@@ -37,8 +37,22 @@ function loop(now) {
     requestAnimationFrame(loop);
     return;
   }
+  if (gameState === GAME_STATE.ONLINE_HOST) {
+    drawOnlineHost(now);
+    drawTransitionOverlay();
+    requestAnimationFrame(loop);
+    return;
+  }
   if (gameState === GAME_STATE.ONLINE_LOBBY) {
+    const canvas = document.getElementById("gameCanvas");
+    if (canvas && document.activeElement !== canvas) canvas.focus();
     drawOnlineLobby(now);
+    drawTransitionOverlay();
+    requestAnimationFrame(loop);
+    return;
+  }
+  if (gameState === GAME_STATE.ONLINE_JOIN) {
+    drawOnlineJoin(now);
     drawTransitionOverlay();
     requestAnimationFrame(loop);
     return;
@@ -88,23 +102,22 @@ function loop(now) {
     return;
   }
 
-  // Fixed-step simulation. Joiner does not run sim (receives state from host); host runs sim and sends state.
-  const isJoiner = typeof netcodeIsEnabled === "function" && netcodeIsEnabled() && typeof netcodeGetStats === "function" && netcodeGetStats().role === "join";
-  if (!isJoiner) {
-    while (accumulatorMs >= SIM_FRAME_MS) {
-      const simNow = simNowMs();
-      let dtScaled = SIM_DT;
-      if (simNow < koSlowmoUntil) dtScaled *= KO_SLOWMO_SCALE;
-      if (typeof netcodeIsEnabled === "function" && netcodeIsEnabled() && gameState === GAME_STATE.VERSUS) {
-        netcodeStepOneFrame(simFrame);
-      } else {
+  // Server-authoritative (HaxBall-style): in online versus nobody runs the sim; both send input and apply server state.
+  const isOnlineVersus = typeof netcodeIsEnabled === "function" && netcodeIsEnabled() && gameState === GAME_STATE.VERSUS;
+  if (isOnlineVersus && typeof netcodeSendInput === "function") {
+    netcodeSendInput();
+  } else {
+    const isJoiner = typeof netcodeIsEnabled === "function" && netcodeIsEnabled() && typeof netcodeGetStats === "function" && netcodeGetStats().role === "join";
+    if (!isJoiner) {
+      while (accumulatorMs >= SIM_FRAME_MS) {
+        const simNow = simNowMs();
+        let dtScaled = SIM_DT;
+        if (simNow < koSlowmoUntil) dtScaled *= KO_SLOWMO_SCALE;
         stepGameplay(dtScaled, simNow);
+        simFrame++;
+        accumulatorMs -= SIM_FRAME_MS;
       }
-      simFrame++;
-      accumulatorMs -= SIM_FRAME_MS;
     }
-  } else if (gameState === GAME_STATE.VERSUS && typeof netcodeJoinerSendInput === "function") {
-    netcodeJoinerSendInput();
   }
   draw(now);
   requestAnimationFrame(loop);

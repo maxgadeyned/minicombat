@@ -2,6 +2,11 @@
 
 const activeHitboxes = [];
 
+if (typeof global !== "undefined") {
+  global.activeHitboxes = activeHitboxes;
+  global.spawnAttackFor = spawnAttackFor;
+}
+
 function spawnAttackFor(attacker, owner, kind) {
   const config = kind === "heavy" ? HEAVY : LIGHT;
   const now = (arguments.length >= 4 && arguments[3] != null) ? arguments[3] : performance.now();

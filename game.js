@@ -5,6 +5,8 @@ const GAME_STATE = {
   MENU: "menu",
   ONLINE_MENU: "online_menu",
   ONLINE_LOBBY: "online_lobby",
+  ONLINE_HOST: "online_host",
+  ONLINE_JOIN: "online_join",
   PRACTICE: "practice",
   VERSUS_SELECT: "versus_select",
   VERSUS_INTRO: "versus_intro",
@@ -68,6 +70,8 @@ function getTransitionOverlayAlpha() {
 let menuSelection = 0;
 let onlineMenuSelection = 0;
 const DEFAULT_SIGNALING_URL = "ws://localhost:8787";
+/** On the JOINER's copy: set this to the HOST's public IP, e.g. "ws://79.52.187.20:8787" (use ws:// not http://). */
+const DEFAULT_JOIN_SERVER_URL = "ws://79.35.184.181:8787";
 let settingsSelection = 0;
 let p2SettingsSelection = 0;
 let p2SettingsFromSettings = false;
@@ -87,10 +91,20 @@ const P1_SETTINGS_LABELS = ["Move Left", "Move Right", "Jump", "Fast Fall", "Das
 const P1_PROFILE_OPTIONS = [{ label: "Playing alone", profile: "solo" }, { label: "Local 2P (same keyboard)", profile: "local" }];
 let p1CharacterIndex = 0, p2CharacterIndex = 0;
 let p1ColorIndex = 0, p2ColorIndex = 0;
+// Display names shown in VS screen / winner banner.
+let p1DisplayName = "Player 1";
+let p2DisplayName = "Player 2";
+// Online host/join form state.
+let onlineHostName = "";
+let onlineHostSelection = 0; // 0 = name, 1 = connect, 2 = back
+let onlineJoinName = "";
+let onlineJoinCode = "";
+let onlineJoinSelection = 0; // 0 = name, 1 = code, 2 = connect, 3 = back
 let stageIndex = 0;
 const STAGE_NAMES = ["Arena", "Sunset", "Night"];
 let transitionStartTime = 0;
-const TRANSITION_DURATION_MS = 3500;
+// Match start countdown duration – align with GO so control begins immediately after.
+const TRANSITION_DURATION_MS = 3000;
 
 let playerStocks = MAX_STOCKS, dummyStocks = MAX_STOCKS, player2Stocks = MAX_STOCKS, roundOver = false;
 let roundOverSelection = 0;
@@ -123,7 +137,7 @@ const TUTORIAL_STEPS = [
 let dummyNextAttackAt = 1000;
 let hitstopUntil = 0, shakeUntil = 0, shakeMagnitude = 0;
 let koSlowmoUntil = 0, koFlashUntil = 0;
-const hitEffects = [];
+const hitEffects = (typeof global !== "undefined" && global.hitEffects) ? global.hitEffects : [];
 
 function _cloneFighter(f) {
   if (!f) return null;
@@ -193,6 +207,56 @@ function saveState() {
 }
 
 function loadState(state) {
+  if (typeof global !== "undefined") {
+    const frame = state.simFrame | 0;
+    global.simFrame = frame;
+    simFrame = frame;
+    global.player = _cloneFighter(state.player);
+    global.player2 = state.player2 ? _cloneFighter(state.player2) : null;
+    global.dummy = _cloneFighter(state.dummy);
+    global.gameState = global.GAME_STATE.VERSUS;
+    gameState = GAME_STATE.VERSUS;
+    global.playerStocks = state.playerStocks;
+    global.player2Stocks = state.player2Stocks;
+    global.dummyStocks = state.dummyStocks;
+    global.roundOver = state.roundOver;
+    global.roundOverSelection = state.roundOverSelection;
+    global.roundOverStartTime = state.roundOverStartTime;
+    global.roundOverWinner = state.roundOverWinner;
+    global.gamePaused = state.gamePaused;
+    global.pauseMenuSelection = state.pauseMenuSelection;
+    global.bestComboCount = state.bestComboCount;
+    global.bestComboDamage = state.bestComboDamage;
+    global.currentComboCount = state.currentComboCount;
+    global.currentComboDamage = state.currentComboDamage;
+    global.lastComboHitTime = state.lastComboHitTime;
+    global.dummyMode = state.dummyMode;
+    global.dummyNextAttackAt = state.dummyNextAttackAt;
+    global.tutorialMode = state.tutorialMode;
+    global.tutorialStep = state.tutorialStep;
+    global.tutorialMoveStartX = state.tutorialMoveStartX;
+    global.tutorialJumpStartGround = state.tutorialJumpStartGround;
+    global.tutorialHeavyDone = state.tutorialHeavyDone;
+    global.tutorialSpecialDone = state.tutorialSpecialDone;
+    global.tutorialComplete = state.tutorialComplete;
+    global.tutorialCompleteAt = state.tutorialCompleteAt;
+    global.hitstopUntil = state.hitstopUntil;
+    global.shakeUntil = state.shakeUntil;
+    global.shakeMagnitude = state.shakeMagnitude;
+    global.koSlowmoUntil = state.koSlowmoUntil;
+    global.koFlashUntil = state.koFlashUntil;
+    global.p1InputBits = state.p1InputBits | 0;
+    global.p2InputBits = state.p2InputBits | 0;
+    global.p1PrevInputBits = state.p1PrevInputBits | 0;
+    global.p2PrevInputBits = state.p2PrevInputBits | 0;
+    global.p1LastJumpPressAt = state.p1LastJumpPressAt;
+    global.p2LastJumpPressAt = state.p2LastJumpPressAt;
+    global.activeHitboxes.length = 0;
+    for (const hb of state.activeHitboxes) global.activeHitboxes.push({ ...hb });
+    global.hitEffects.length = 0;
+    for (const e of state.hitEffects) global.hitEffects.push({ ...e });
+    return;
+  }
   simFrame = state.simFrame | 0;
 
   player = _cloneFighter(state.player);
@@ -403,6 +467,13 @@ function applyInputBitsForSimFrame(p1Bits, p2Bits, now) {
 
   p1PrevInputBits = p1InputBits;
   p2PrevInputBits = p2InputBits;
+
+  if (typeof global !== "undefined") {
+    global.p1Held = p1Held;
+    global.p2Held = p2Held;
+    global.p1Pressed = p1Pressed;
+    global.p2Pressed = p2Pressed;
+  }
 }
 
 function sampleInputsForSimFrame(now) {
@@ -438,6 +509,7 @@ function stepGameplay(dt, now, overrideP1Bits, overrideP2Bits) {
   applyBlastZoneRespawn(player, false, now);
   handleCombat(dt, now);
   updateTutorial(now);
+  if (typeof global !== "undefined") simFrame++;
 }
 
 function handlePlayerInput(dt, now) {
@@ -609,10 +681,6 @@ function handleCombat(dt, now) {
         victim.parryFlashUntil = now + 150;
         attacker.stunnedUntil = Math.max(attacker.stunnedUntil, now + PARRY_STUN_ATTACKER_MS);
         hitstopUntil = Math.max(hitstopUntil, now + HITSTOP_PARRY_MS);
-        if (gameState === GAME_STATE.VERSUS) {
-          shakeUntil = Math.max(shakeUntil, now + 80);
-          shakeMagnitude = Math.max(shakeMagnitude, SHAKE_PARRY);
-        }
         hitEffects.push({ type: "text", text: "PARRY!", x: victim.pos.x, y: victim.pos.y - 50, createdAt: now, duration: 200 });
         playSfx("parry");
       } else if (canBlock && !isParry) {
@@ -690,11 +758,6 @@ function handleCombat(dt, now) {
 
       if ((victim.rollInvulnUntil || 0) > 0 && now < victim.rollInvulnUntil && now < (victim.rollingUntil || 0)) return;
       hitstopUntil = Math.max(hitstopUntil, now + (isLight ? HITSTOP_LIGHT_MS : HITSTOP_HEAVY_MS));
-      // Screen shake only during Versus (P1 vs P2) so Practice with the dummy never jitters.
-      if (gameState === GAME_STATE.VERSUS) {
-        shakeUntil = Math.max(shakeUntil, now + 100);
-        shakeMagnitude = Math.max(shakeMagnitude, isLight ? SHAKE_LIGHT : SHAKE_HEAVY);
-      }
       hitEffects.push({ type: "spark", x: victim.pos.x, y: victim.pos.y - victim.size.h * 0.3, createdAt: now, duration: 180, isHeavy: !isLight });
       hitEffects.push({ type: "arrow", x: victim.pos.x, y: victim.pos.y, angle: Math.atan2(vy, vx), createdAt: now, duration: 200 });
 
@@ -715,6 +778,7 @@ function handleCombat(dt, now) {
 }
 
 function updateHUD() {
+  if (typeof global !== "undefined" || typeof dummyDamageLabel === "undefined") return;
   if (gameState === GAME_STATE.VERSUS && player2) {
     const p1 = Math.round(player.damage), p2 = Math.round(player2.damage);
     if (dummyDamageLabel.parentNode && dummyDamageLabel.parentNode.firstChild) {
@@ -858,6 +922,7 @@ function spawnVersusFighters() {
   player2Stocks = MAX_STOCKS;
   roundOver = false;
   roundOverWinner = null;
+  gamePaused = false;
   bestComboCount = 0;
   bestComboDamage = 0;
   hitEffects.length = 0;
@@ -898,9 +963,12 @@ function toggleFullscreen() {
 
 function updateTransition(now) {
   const elapsed = now - transitionStartTime;
-  if (elapsed >= TRANSITION_DURATION_MS) {
-    gameState = GAME_STATE.VERSUS;
-  }
+  if (elapsed < TRANSITION_DURATION_MS) return;
+  // Online: don't use local timer – host uses real-time setTimeout (fixes 8s delay on slow/throttled host), joiner waits for versusGo.
+  const isOnline = typeof netcodeIsEnabled === "function" && netcodeIsEnabled() && typeof netcodeGetStats === "function";
+  if (isOnline) return;
+  gameState = GAME_STATE.VERSUS;
+  if (typeof netcodeOnHostEnteredVersus === "function") netcodeOnHostEnteredVersus();
 }
 
 function getTransitionCountdown(now) {
@@ -922,5 +990,16 @@ function hardReset() {
     if (tutorialMode) startTutorial();
     else startPractice();
   } else if (gameState === GAME_STATE.VERSUS) startVersusMatch();
+}
+
+if (typeof global !== "undefined") {
+  global.loadState = loadState;
+  global.saveState = saveState;
+  global.stepGameplay = stepGameplay;
+}
+if (typeof window !== "undefined") {
+  window.STAGE_NAMES = STAGE_NAMES;
+  window.GAME_STATE = GAME_STATE;
+  window.getGameState = function () { return gameState; };
 }
 

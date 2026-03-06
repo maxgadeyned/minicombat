@@ -71,11 +71,6 @@ function applyBlastZoneRespawn(fighter, isDummy, nowMs) {
   if (!roundOver) {
     koSlowmoUntil = Math.max(koSlowmoUntil || 0, nowMs + KO_SLOWMO_MS);
     koFlashUntil = Math.max(koFlashUntil || 0, nowMs + KO_FLASH_MS);
-    // Only apply big KO screen shake during Versus; Practice KOs keep slowmo/flash but no camera jitter.
-    if (gameState === GAME_STATE.VERSUS) {
-      shakeUntil = Math.max(shakeUntil, nowMs + 350);
-      shakeMagnitude = Math.max(shakeMagnitude, SHAKE_KO);
-    }
     playSfx("ko");
   }
   // Respawn at the center of the platform; they will fall in from above.
@@ -93,6 +88,12 @@ function applyBlastZoneRespawn(fighter, isDummy, nowMs) {
     fighter.respawnAt = respawnAt;
     fighter.invulnUntil = respawnAt + RESPAWN_INVULN_MS;
     fighter.onGround = false;
+    // Clear all status timers so control is fully restored after respawn.
+    fighter.stunnedUntil = nowMs;
+    fighter.parryWindowUntil = 0;
+    fighter.parryLockoutUntil = 0;
+    fighter.rollingUntil = 0;
+    fighter.rollInvulnUntil = 0;
     updateHUD();
   } else if (isDummy) {
     dummyStocks = Math.max(0, dummyStocks - 1);
@@ -104,6 +105,11 @@ function applyBlastZoneRespawn(fighter, isDummy, nowMs) {
     fighter.respawnAt = respawnAt;
     fighter.invulnUntil = respawnAt + RESPAWN_INVULN_MS;
     fighter.onGround = false;
+    fighter.stunnedUntil = nowMs;
+    fighter.parryWindowUntil = 0;
+    fighter.parryLockoutUntil = 0;
+    fighter.rollingUntil = 0;
+    fighter.rollInvulnUntil = 0;
     updateHUD();
   } else {
     playerStocks = Math.max(0, playerStocks - 1);
@@ -115,6 +121,11 @@ function applyBlastZoneRespawn(fighter, isDummy, nowMs) {
     fighter.respawnAt = respawnAt;
     fighter.invulnUntil = respawnAt + RESPAWN_INVULN_MS;
     fighter.onGround = false;
+    fighter.stunnedUntil = nowMs;
+    fighter.parryWindowUntil = 0;
+    fighter.parryLockoutUntil = 0;
+    fighter.rollingUntil = 0;
+    fighter.rollInvulnUntil = 0;
     updateHUD();
   }
 }
@@ -143,5 +154,13 @@ function resolvePlayerDummyCollision() {
       player2.vel.x *= 0.6;
     }
   }
+}
+
+if (typeof global !== "undefined") {
+  global.getAABB = getAABB;
+  global.rectsOverlap = rectsOverlap;
+  global.integrateFighter = integrateFighter;
+  global.applyBlastZoneRespawn = applyBlastZoneRespawn;
+  global.resolvePlayerDummyCollision = resolvePlayerDummyCollision;
 }
 

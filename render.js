@@ -2,6 +2,24 @@
 
 function clear() { ctx.clearRect(0, 0, WORLD.width, WORLD.height); }
 
+function drawVignette() {
+  const margin = 40;
+  const grd = ctx.createRadialGradient(
+    WORLD.width / 2,
+    WORLD.height / 2,
+    Math.min(WORLD.width, WORLD.height) * 0.2,
+    WORLD.width / 2,
+    WORLD.height / 2,
+    Math.max(WORLD.width, WORLD.height) * 0.75
+  );
+  grd.addColorStop(0, "rgba(0,0,0,0)");
+  grd.addColorStop(1, "rgba(0,0,0,0.55)");
+  ctx.save();
+  ctx.fillStyle = grd;
+  ctx.fillRect(-margin, -margin, WORLD.width + margin * 2, WORLD.height + margin * 2);
+  ctx.restore();
+}
+
 function drawTransitionOverlay() {
   const alpha = getTransitionOverlayAlpha();
   if (alpha <= 0) return;
@@ -148,6 +166,7 @@ function drawTitleScreen(now) {
   grad.addColorStop(1, "#0f3460");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  drawVignette();
   const titleY = WORLD.height * 0.38 + 4 * Math.sin(now * 0.002);
   ctx.font = "bold 52px system-ui";
   ctx.textAlign = "center";
@@ -171,8 +190,9 @@ function drawMenu(now) {
   grad.addColorStop(1, "#0f3460");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
-  ctx.fillStyle = "rgba(0,0,0,0.2)";
-  fillRoundedRect(WORLD.width * 0.2, WORLD.height * 0.22, WORLD.width * 0.6, 120, 12);
+  drawVignette();
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  fillRoundedRect(WORLD.width * 0.2, WORLD.height * 0.19, WORLD.width * 0.6, 130, 14);
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.font = "bold 44px system-ui";
   ctx.textAlign = "center";
@@ -224,7 +244,8 @@ function drawOnlineMenu(now) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
 
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  drawVignette();
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
   fillRoundedRect(WORLD.width * 0.18, WORLD.height * 0.2, WORLD.width * 0.64, 420, 16);
 
   ctx.textAlign = "center";
@@ -259,6 +280,154 @@ function drawOnlineMenu(now) {
   ctx.restore();
 }
 
+function drawOnlineHost(now) {
+  clear();
+  ctx.save();
+  const t = now * 0.00025;
+  const grad = ctx.createLinearGradient(WORLD.width * 0.25 * Math.sin(t), 0, WORLD.width, WORLD.height);
+  grad.addColorStop(0, "#141428");
+  grad.addColorStop(1, "#0f3460");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  drawVignette();
+
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  fillRoundedRect(WORLD.width * 0.2, WORLD.height * 0.24, WORLD.width * 0.6, 210, 14);
+
+  ctx.textAlign = "center";
+  ctx.font = "bold 30px system-ui";
+  drawTextWithShadow("HOST ONLINE ROOM", WORLD.width / 2, WORLD.height * 0.28, "rgba(255,255,255,0.96)", "rgba(0,0,0,0.5)", 6);
+
+  ctx.font = "14px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillText("Choose the name that will appear in the match.", WORLD.width / 2, WORLD.height * 0.32);
+
+  const fieldY = WORLD.height * 0.38;
+  const x = WORLD.width * 0.24;
+  const w = WORLD.width * 0.52;
+
+  const isNameSel = onlineHostSelection === 0;
+  ctx.textAlign = "left";
+  ctx.font = "13px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.fillText("Name", x, fieldY - 10);
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  fillRoundedRect(x, fieldY, w, 34, 8);
+  ctx.strokeStyle = isNameSel ? "#6bffb5" : "rgba(255,255,255,0.35)";
+  ctx.lineWidth = isNameSel ? 2 : 1;
+  roundRectPath(x, fieldY, w, 34, 8);
+  ctx.stroke();
+  ctx.font = "16px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  const nameText = onlineHostName || "Host";
+  ctx.fillText(nameText, x + 10, fieldY + 23);
+
+  // Buttons
+  const btnY = fieldY + 64;
+  const btnW = 150;
+  const btnH = 34;
+  const centerX = WORLD.width / 2;
+
+  function drawButton(label, index, offsetX) {
+    const isSel = onlineHostSelection === index;
+    const bx = centerX + offsetX - btnW / 2;
+    const by = btnY;
+    ctx.fillStyle = isSel ? "#6bffb5" : "rgba(0,0,0,0.65)";
+    fillRoundedRect(bx, by, btnW, btnH, 8);
+    ctx.textAlign = "center";
+    ctx.font = "15px system-ui";
+    ctx.fillStyle = isSel ? "#0f172a" : "rgba(255,255,255,0.9)";
+    ctx.fillText(label, bx + btnW / 2, by + 23);
+  }
+
+  drawButton("Create room", 1, -90);
+  drawButton("Back", 2, 90);
+
+  ctx.font = "13px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillText("↑↓ Move  •  Type to edit  •  Enter / Space Select  •  Esc Back", WORLD.width / 2, WORLD.height * 0.82);
+
+  ctx.restore();
+}
+
+function drawOnlineJoin(now) {
+  clear();
+  ctx.save();
+  const t = now * 0.00025;
+  const grad = ctx.createLinearGradient(WORLD.width * 0.25 * Math.sin(t), 0, WORLD.width, WORLD.height);
+  grad.addColorStop(0, "#141428");
+  grad.addColorStop(1, "#0f3460");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  drawVignette();
+
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  fillRoundedRect(WORLD.width * 0.2, WORLD.height * 0.22, WORLD.width * 0.6, 260, 14);
+
+  ctx.textAlign = "center";
+  ctx.font = "bold 30px system-ui";
+  drawTextWithShadow("JOIN ONLINE ROOM", WORLD.width / 2, WORLD.height * 0.26, "rgba(255,255,255,0.96)", "rgba(0,0,0,0.5)", 6);
+
+  ctx.font = "14px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillText("Enter your name and room code, then connect.", WORLD.width / 2, WORLD.height * 0.3);
+
+  const startY = WORLD.height * 0.35;
+  const lineH = 54;
+
+  function drawField(label, value, index) {
+    const isSel = onlineJoinSelection === index;
+    const x = WORLD.width * 0.24;
+    const w = WORLD.width * 0.52;
+    const y = startY + index * lineH;
+    ctx.textAlign = "left";
+    ctx.font = "13px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.fillText(label, x, y - 10);
+    ctx.fillStyle = "rgba(0,0,0,0.65)";
+    fillRoundedRect(x, y, w, 34, 8);
+    ctx.strokeStyle = isSel ? "#6bffb5" : "rgba(255,255,255,0.35)";
+    ctx.lineWidth = isSel ? 2 : 1;
+    roundRectPath(x, y, w, 34, 8);
+    ctx.stroke();
+    ctx.textAlign = "left";
+    ctx.font = "16px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    const text = value || (label === "Name" ? "Guest" : "CODE");
+    ctx.fillText(text, x + 10, y + 23);
+  }
+
+  drawField("Name", onlineJoinName, 0);
+  drawField("Room code", onlineJoinCode, 1);
+
+  // Buttons
+  const btnY = startY + 2 * lineH + 12;
+  const btnW = 150;
+  const btnH = 34;
+  const centerX = WORLD.width / 2;
+
+  function drawButton(label, index, offsetX) {
+    const isSel = onlineJoinSelection === index;
+    const x = centerX + offsetX - btnW / 2;
+    const y = btnY;
+    ctx.fillStyle = isSel ? "#6bffb5" : "rgba(0,0,0,0.65)";
+    fillRoundedRect(x, y, btnW, btnH, 8);
+    ctx.textAlign = "center";
+    ctx.font = "15px system-ui";
+    ctx.fillStyle = isSel ? "#0f172a" : "rgba(255,255,255,0.9)";
+    ctx.fillText(label, x + btnW / 2, y + 23);
+  }
+
+  drawButton("Connect", 2, -90);
+  drawButton("Back", 3, 90);
+
+  ctx.font = "13px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillText("↑↓ Move  •  Type to edit  •  Enter / Space Select  •  Esc Back", WORLD.width / 2, WORLD.height * 0.82);
+
+  ctx.restore();
+}
+
 function drawOnlineLobby(now) {
   clear();
   ctx.save();
@@ -269,14 +438,21 @@ function drawOnlineLobby(now) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
 
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  fillRoundedRect(WORLD.width * 0.16, WORLD.height * 0.22, WORLD.width * 0.68, 360, 16);
+  drawVignette();
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  fillRoundedRect(WORLD.width * 0.16, WORLD.height * 0.18, WORLD.width * 0.68, 420, 16);
 
   const stats = typeof netcodeGetStats === "function" ? netcodeGetStats() : null;
   const role = stats && stats.role ? stats.role : "—";
   const state = stats && stats.connectionState ? stats.connectionState : "—";
   const code = stats && stats.roomCode ? stats.roomCode : null;
   const err = stats && stats.lastError ? stats.lastError : null;
+  const lobby = typeof netcodeGetLobbyState === "function" ? netcodeGetLobbyState() : null;
+
+  // Drain lobby character selection queue (from keydown capture) so 1–6 always applies.
+  if (typeof netcodeConsumeLobbyCharSelection === "function") {
+    while (netcodeConsumeLobbyCharSelection()) { /* drain */ }
+  }
 
   ctx.textAlign = "center";
   ctx.font = "bold 34px system-ui";
@@ -284,31 +460,98 @@ function drawOnlineLobby(now) {
 
   ctx.font = "18px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillText("Role: " + role.toUpperCase(), WORLD.width / 2, 185);
-  ctx.fillText("Status: " + state, WORLD.width / 2, 215);
+  ctx.fillText("Role: " + role.toUpperCase(), WORLD.width / 2, 180);
+  ctx.fillText("Status: " + state, WORLD.width / 2, 210);
 
   if (code) {
     ctx.font = "bold 42px system-ui";
     ctx.fillStyle = "#6bffb5";
-    drawTextWithShadow(code, WORLD.width / 2, 290, "#6bffb5", "rgba(0,0,0,0.4)", 6);
+    drawTextWithShadow(code, WORLD.width / 2, 260, "#6bffb5", "rgba(0,0,0,0.4)", 6);
     ctx.font = "16px system-ui";
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText("Share this room code with your opponent", WORLD.width / 2, 325);
+    ctx.fillText("Share this room code with your opponent", WORLD.width / 2, 292);
   } else {
     ctx.font = "16px system-ui";
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText("Waiting for room code / connection…", WORLD.width / 2, 300);
+    if (state === "signaling") {
+      ctx.fillText("Connecting to server…", WORLD.width / 2, 272);
+      ctx.font = "14px system-ui";
+      ctx.fillStyle = "rgba(255,255,255,0.45)";
+      ctx.fillText("Start the game server: cd server && node signaling.js", WORLD.width / 2, 294);
+    } else if (state === "error") {
+      ctx.fillText("Connection failed. Start the server (see below).", WORLD.width / 2, 280);
+    } else {
+      ctx.fillText("Waiting for room code / connection…", WORLD.width / 2, 280);
+    }
   }
+
+  // Player panels
+  const leftX = WORLD.width * 0.26;
+  const rightX = WORLD.width * 0.74;
+  const panelY = 320;
+  const panelW = WORLD.width * 0.26;
+  const panelH = 170;
+
+  const localName = lobby && lobby.localName ? lobby.localName : (role === "host" ? "Host" : "Guest");
+  const remoteName = lobby && lobby.remoteName ? lobby.remoteName : (role === "host" ? "Joiner" : "Host");
+  const localIdx = lobby && typeof lobby.localCharIndex === "number" ? lobby.localCharIndex : null;
+  const remoteIdx = lobby && typeof lobby.remoteCharIndex === "number" ? lobby.remoteCharIndex : null;
+
+  const playerTypesRef = (typeof window !== "undefined" && window.PLAYER_TYPES) ? window.PLAYER_TYPES : [];
+  const totalChars = Array.isArray(playerTypesRef) ? playerTypesRef.length : 6;
+
+  function drawPlayerPanel(x, name, idx, label) {
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    fillRoundedRect(x - panelW / 2, panelY, panelW, panelH, 12);
+    ctx.textAlign = "center";
+    ctx.font = "12px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.fillText(label, x, panelY + 20);
+    ctx.font = "bold 20px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.fillText(name, x, panelY + 48);
+    if (idx != null && totalChars > 0 && playerTypesRef.length > 0) {
+      const type = playerTypesRef[idx % totalChars];
+      const color = type && type.color ? type.color : "#ffffff";
+      ctx.font = "14px system-ui";
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fillText("Character: " + (type && type.label ? type.label : "—"), x, panelY + 78);
+      drawCharacterPortrait(type && type.archetype ? type.archetype : "archer", color, x, panelY + 128, 44);
+    } else {
+      ctx.font = "14px system-ui";
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.fillText("Select with 1–6", x, panelY + 90);
+    }
+    ctx.restore();
+  }
+
+  drawPlayerPanel(leftX, role === "host" ? localName : remoteName, role === "host" ? localIdx : remoteIdx, "HOST");
+  drawPlayerPanel(rightX, role === "host" ? remoteName : localName, role === "host" ? remoteIdx : localIdx, "JOINER");
+
+  // Stage info (host-controlled)
+  const stageIdx = lobby && Number.isInteger(lobby.stageIndex) ? lobby.stageIndex : (typeof stageIndex === "number" ? stageIndex : 0);
+  const hasStages = typeof STAGE_NAMES !== "undefined" && Array.isArray(STAGE_NAMES) && STAGE_NAMES.length;
+  const stageName = hasStages ? STAGE_NAMES[(stageIdx + STAGE_NAMES.length) % STAGE_NAMES.length] : "Default";
+  const stageLabel = lobby && lobby.stageIsRandom ? `Stage: Random (${stageName})` : `Stage: ${stageName}`;
+
+  ctx.font = "16px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.fillText(stageLabel, WORLD.width / 2, panelY + panelH + 32);
 
   if (err) {
     ctx.font = "14px system-ui";
     ctx.fillStyle = "rgba(255,120,120,0.9)";
-    ctx.fillText(err, WORLD.width / 2, 370);
+    ctx.fillText(err, WORLD.width / 2, panelY + panelH + 56);
   }
 
   ctx.font = "13px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.fillText("Esc Back (disconnect)", WORLD.width / 2, WORLD.height * 0.82);
+  if (role === "host") {
+    ctx.fillText("Esc Back (disconnect)  •  N rename  •  1–6 choose your character  •  ←/→ stage  •  R random stage  •  Enter start when both ready", WORLD.width / 2, WORLD.height * 0.86);
+  } else {
+    ctx.fillText("Esc Back (disconnect)  •  N rename  •  1–6 choose your character  •  Waiting for host to start…", WORLD.width / 2, WORLD.height * 0.86);
+  }
   ctx.restore();
 }
 
@@ -321,7 +564,8 @@ function drawSettings(now) {
   grad.addColorStop(1, "#16213e");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  drawVignette();
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
   fillRoundedRect(WORLD.width * 0.15, 80, WORLD.width * 0.7, 430, 16);
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.font = "bold 34px system-ui";
@@ -375,6 +619,7 @@ function drawCredits(now) {
   grad.addColorStop(1, "#16213e");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  drawVignette();
   ctx.fillStyle = "rgba(0,0,0,0.3)";
   fillRoundedRect(WORLD.width * 0.2, WORLD.height * 0.18, WORLD.width * 0.6, 380, 16);
   ctx.fillStyle = "rgba(255,255,255,0.95)";
@@ -526,6 +771,7 @@ function drawCharacterSelect(now) {
   grad.addColorStop(1, "#0f3460");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  drawVignette();
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.font = "bold 34px system-ui";
   ctx.textAlign = "center";
@@ -676,21 +922,20 @@ function drawVersusIntro(now) {
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.font = "bold 48px system-ui";
   drawTextWithShadow("VS", WORLD.width / 2, WORLD.height * 0.38, "rgba(255,255,255,0.98)", "rgba(0,0,0,0.5)", 8);
-  const p1Name = PLAYER_TYPES[p1CharacterIndex].label;
-  const p2Name = PLAYER_TYPES[p2CharacterIndex].label;
+  const p1Char = PLAYER_TYPES[p1CharacterIndex].label;
+  const p2Char = PLAYER_TYPES[p2CharacterIndex].label;
+  const leftName = (typeof p1DisplayName !== "undefined" ? p1DisplayName : "Player 1") + " (" + p1Char + ")";
+  const rightName = (typeof p2DisplayName !== "undefined" ? p2DisplayName : "Player 2") + " (" + p2Char + ")";
   const p1Color = COLOR_PALETTE[p1ColorIndex % COLOR_PALETTE.length];
   const p2Color = COLOR_PALETTE[p2ColorIndex % COLOR_PALETTE.length];
   ctx.font = "bold 32px system-ui";
   ctx.fillStyle = p1Color;
-  ctx.fillText("P1  " + p1Name, WORLD.width * 0.35, WORLD.height * 0.5);
+  ctx.fillText(leftName, WORLD.width * 0.3, WORLD.height * 0.5);
   ctx.fillStyle = p2Color;
-  ctx.fillText(p2Name + "  P2", WORLD.width * 0.65, WORLD.height * 0.5);
+  ctx.fillText(rightName, WORLD.width * 0.7, WORLD.height * 0.5);
   ctx.font = "22px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.7)";
   ctx.fillText(STAGE_NAMES[stageIndex], WORLD.width / 2, WORLD.height * 0.62);
-  ctx.font = "14px system-ui";
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fillText("Press Enter to start  •  Auto-advances in 3 sec", WORLD.width / 2, WORLD.height * 0.72);
   ctx.restore();
 }
 
@@ -938,10 +1183,12 @@ function drawEntity(fighter, now) {
 
 function drawHitboxes(now) {
   ctx.save();
+  const isJoiner = typeof netcodeIsEnabled === "function" && netcodeIsEnabled() &&
+    typeof netcodeGetStats === "function" && netcodeGetStats().role === "join";
   for (const hb of activeHitboxes) {
     const age = now - hb.createdAt;
     const lifetime = hb.lifetimeMs || ATTACK_LIFETIME_MS;
-    if (age > lifetime) continue;
+    if (!isJoiner && age > lifetime) continue;
     const alpha = Math.max(0, 1 - age / lifetime);
     if (hb.style === "trap") {
       ctx.globalAlpha = 0.35 + 0.2 * alpha;
@@ -963,7 +1210,8 @@ function drawEffects(now) {
   const remaining = [];
   for (const effect of hitEffects) {
     const age = now - effect.createdAt;
-    if (age > effect.duration) continue;
+    const life = effect.duration || 0;
+    if (!isNaN(life) && age > life) continue;
     const t = age / effect.duration;
     if (effect.type === "spark") {
       ctx.save();
@@ -1052,17 +1300,19 @@ function drawStageBackground() {
 function draw(now) {
   clear();
   ctx.save();
-  if (now < shakeUntil && shakeMagnitude > 0) {
-    const ox = (Math.random() * 2 - 1) * shakeMagnitude;
-    const oy = (Math.random() * 2 - 1) * shakeMagnitude;
+  const gameTime = (gameState === GAME_STATE.VERSUS || gameState === GAME_STATE.PRACTICE) && typeof simNowMs === "function" ? simNowMs() : now;
+  if (gameTime < shakeUntil && shakeMagnitude > 0) {
+    const m = Math.min(shakeMagnitude, typeof MAX_SHAKE_PIXELS === "number" ? MAX_SHAKE_PIXELS : shakeMagnitude);
+    const ox = (Math.random() * 2 - 1) * m;
+    const oy = (Math.random() * 2 - 1) * m;
     ctx.translate(ox, oy);
   }
   drawStageBackground();
   drawPlatform();
-  drawEntity(player, now);
-  if (gameState === GAME_STATE.VERSUS && player2) drawEntity(player2, now);
-  else drawEntity(dummy, now);
-  const gameTime = (gameState === GAME_STATE.VERSUS || gameState === GAME_STATE.PRACTICE) && typeof simNowMs === "function" ? simNowMs() : now;
+  // Use simulation time for time-based fighter visuals (respawn glow, roll invuln).
+  drawEntity(player, gameTime);
+  if (gameState === GAME_STATE.VERSUS && player2) drawEntity(player2, gameTime);
+  else drawEntity(dummy, gameTime);
   drawHitboxes(gameTime);
   drawEffects(gameTime);
   ctx.restore();
@@ -1169,20 +1419,16 @@ function draw(now) {
       ctx.save();
       ctx.globalAlpha = 0.92;
       ctx.fillStyle = "rgba(0,0,0,0.55)";
-      fillRoundedRect(12, WORLD.height - 110, 420, 96, 10);
+      fillRoundedRect(12, WORLD.height - 86, 420, 72, 10);
       ctx.fillStyle = "rgba(255,255,255,0.9)";
       ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
       ctx.textAlign = "left";
-      const behind = s.lastRemoteFrame >= 0 && simFrame < s.lastRemoteFrame ? ((s.lastRemoteFrame - simFrame) / 60).toFixed(1) : null;
-      const ahead = s.lastRemoteFrame >= 0 && simFrame > s.lastRemoteFrame ? ((simFrame - s.lastRemoteFrame) / 60).toFixed(1) : null;
-      const delayStr = behind != null ? `YOU BEHIND ~${behind}s` : (ahead != null ? `you ahead ~${ahead}s` : "");
       const lines = [
         `net: ${s.connectionState || "?"}  role: ${(s.role || "?").toUpperCase()}  room: ${s.roomCode || "-"}`,
-        `frame: ${simFrame}  remoteLast: ${s.lastRemoteFrame}  recv: ${s.receivedInputCount != null ? s.receivedInputCount : "-"}  ${delayStr}`,
+        `frame: ${simFrame}  recvInputs: ${s.receivedInputCount != null ? s.receivedInputCount : "-"}`,
         `rollbacks: ${s.rollbackCount}  lastFrom: ${s.lastRollbackFromFrame}`,
-        `Keep game window in focus (no minimize/alt-tab) to avoid huge delay.`,
       ];
-      for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], 24, WORLD.height - 86 + i * 18);
+      for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], 24, WORLD.height - 64 + i * 18);
       ctx.restore();
     }
   }
@@ -1219,8 +1465,16 @@ function draw(now) {
     ctx.font = "bold 32px system-ui";
     let winnerText = "ROUND OVER";
     if (gameState === GAME_STATE.VERSUS && player2) {
-      if (playerStocks > 0 && player2Stocks <= 0) winnerText = "P1 " + player.name + " WINS";
-      else if (player2Stocks > 0 && playerStocks <= 0) winnerText = "P2 " + player2.name + " WINS";
+      const isOnline = typeof netcodeIsEnabled === "function" && netcodeIsEnabled();
+      if (playerStocks > 0 && player2Stocks <= 0) {
+        const char = PLAYER_TYPES[p1CharacterIndex].label;
+        const name = (typeof p1DisplayName !== "undefined" ? p1DisplayName : "Player 1");
+        winnerText = `${name} (${char}) WINS`;
+      } else if (player2Stocks > 0 && playerStocks <= 0) {
+        const char = PLAYER_TYPES[p2CharacterIndex].label;
+        const name = (typeof p2DisplayName !== "undefined" ? p2DisplayName : "Player 2");
+        winnerText = `${name} (${char}) WINS`;
+      }
     } else {
       if (playerStocks > 0 && dummyStocks <= 0) winnerText = player.name + " WINS";
       else if (dummyStocks > 0 && playerStocks <= 0) winnerText = "DUMMY WINS";
@@ -1232,7 +1486,8 @@ function draw(now) {
       ctx.font = "16px system-ui";
       ctx.fillText("Press R to reset", WORLD.width / 2, WORLD.height / 2 + 28);
     } else if (gameState === GAME_STATE.VERSUS && player2) {
-      const opts = ["Restart", "Change characters", "Exit to menu"];
+      const isOnline = typeof netcodeIsEnabled === "function" && netcodeIsEnabled();
+      const opts = isOnline ? ["Restart", "Back to lobby", "Exit to menu"] : ["Restart", "Change characters", "Exit to menu"];
       const startY = WORLD.height / 2 + 8;
       const lineH = 36;
       for (let i = 0; i < opts.length; i++) {

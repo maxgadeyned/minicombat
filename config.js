@@ -56,6 +56,7 @@ const SHAKE_LIGHT = 2;
 const SHAKE_HEAVY = 4;
 const SHAKE_PARRY = 3;
 const SHAKE_KO = 12;
+const MAX_SHAKE_PIXELS = 8;
 const KO_SLOWMO_MS = 650;
 const KO_SLOWMO_SCALE = 0.35;
 const KO_FLASH_MS = 180;

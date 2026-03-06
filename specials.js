@@ -567,3 +567,6 @@ function useShadeSpecial(fighter, owner, input, now) {
   fighter.nextSpecialAt = now + 600;
 }
 
+if (typeof global !== "undefined") {
+  global.performSpecialFor = performSpecialFor;
+}

@@ -5,9 +5,11 @@
 const keys = new Set();
 
 
+const CHAR_SELECT_CODES = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Numpad1", "Numpad2", "Numpad3", "Numpad4", "Numpad5", "Numpad6"];
 window.addEventListener("keydown", (e) => {
-  if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Minus", "Escape"].includes(e.code)) e.preventDefault();
+  if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Minus", "Escape", "Backspace"].includes(e.code)) e.preventDefault();
   if (gameState === GAME_STATE.VERSUS && player2 && isP2Key(e)) e.preventDefault();
+  if (gameState === GAME_STATE.ONLINE_LOBBY && CHAR_SELECT_CODES.includes(e.code)) e.preventDefault();
   if (e.repeat) return;
   if (e.code === "F11" && p1RebindingAction === null && p2RebindingAction === null) {
     e.preventDefault();
@@ -62,19 +64,18 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "Enter" || e.code === "Space") {
       playSfx("menuConfirm");
       if (onlineMenuSelection === 0) {
-        gameState = GAME_STATE.ONLINE_LOBBY;
+        // Host setup screen (enter name before creating room).
+        const suggested = (typeof netcodeGetLobbyState === "function" && netcodeGetLobbyState().localName) || "Host";
+        onlineHostName = suggested;
+        onlineHostSelection = 0;
+        gameState = GAME_STATE.ONLINE_HOST;
         screenEnterTime = performance.now();
-        // Host always connects to local server; joiner uses DEFAULT_SIGNALING_URL (your public IP).
-        netOnlineHost("ws://localhost:8787");
       } else if (onlineMenuSelection === 1) {
-        const code = prompt("Enter room code") || "";
-        if (code.trim()) {
-          gameState = GAME_STATE.ONLINE_LOBBY;
-          screenEnterTime = performance.now();
-          netOnlineJoin(DEFAULT_SIGNALING_URL, code.trim());
-        } else {
-          playSfx("menuBack");
-        }
+        onlineJoinName = "";
+        onlineJoinCode = "";
+        onlineJoinSelection = 0;
+        gameState = GAME_STATE.ONLINE_JOIN;
+        screenEnterTime = performance.now();
       } else {
         playSfx("menuBack");
         startTransition(GAME_STATE.MENU);
@@ -90,6 +91,146 @@ window.addEventListener("keydown", (e) => {
       startTransition(GAME_STATE.MENU);
       return;
     }
+    const stats = typeof netcodeGetStats === "function" ? netcodeGetStats() : null;
+    const role = stats && stats.role;
+    // Rename (both sides).
+    if (e.code === "KeyN") {
+      const lobby = typeof netcodeGetLobbyState === "function" ? netcodeGetLobbyState() : null;
+      const current = lobby && lobby.localName ? lobby.localName : (role === "host" ? "Host" : "Guest");
+      const name = prompt("Enter your name", current) || "";
+      if (typeof netcodeSetLocalName === "function" && name.trim()) netcodeSetLocalName(name.trim());
+      return;
+    }
+    // Character selection: 1–6 (number row or numpad) map to character indices.
+    const charKeyToIndex = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3, Numpad5: 4, Numpad6: 5 };
+    const charIdx = charKeyToIndex[e.code];
+    if (charIdx !== undefined) {
+      e.preventDefault();
+      if (typeof netcodePushLobbyCharSelection === "function") netcodePushLobbyCharSelection(charIdx);
+      if (typeof netcodeSetLocalCharIndex === "function") netcodeSetLocalCharIndex(charIdx);
+      playSfx("menuSelect");
+      return;
+    }
+    // Host-only stage controls & start.
+    if (role === "host") {
+      if (e.code === "ArrowLeft") { if (typeof netcodeHostAdjustStage === "function") netcodeHostAdjustStage(-1); return; }
+      if (e.code === "ArrowRight") { if (typeof netcodeHostAdjustStage === "function") netcodeHostAdjustStage(1); return; }
+      if (e.code === "KeyR") { if (typeof netcodeHostSetRandomStage === "function") netcodeHostSetRandomStage(); return; }
+      if (e.code === "Enter" || e.code === "Space") {
+        if (typeof netOnlineHostStartMatch === "function" && typeof netOnlineHostCanStart === "function" && netOnlineHostCanStart()) {
+          playSfx("menuConfirm");
+          netOnlineHostStartMatch();
+        }
+        return;
+      }
+    }
+    return;
+  }
+
+  if (gameState === GAME_STATE.ONLINE_HOST) {
+    if (e.code === "Escape") {
+      playSfx("menuBack");
+      startTransition(GAME_STATE.ONLINE_MENU);
+      return;
+    }
+    const maxFields = 3; // name, connect, back
+    if (e.code === "ArrowDown") {
+      playSfx("menuSelect");
+      onlineHostSelection = (onlineHostSelection + 1) % maxFields;
+      return;
+    }
+    if (e.code === "ArrowUp") {
+      playSfx("menuSelect");
+      onlineHostSelection = (onlineHostSelection - 1 + maxFields) % maxFields;
+      return;
+    }
+    if (onlineHostSelection === 0) {
+      if (e.code === "Backspace") {
+        if (onlineHostName.length) onlineHostName = onlineHostName.slice(0, -1);
+        return;
+      }
+      if (e.key && e.key.length === 1) {
+        const ch = e.key;
+        if (onlineHostName.length < 16 && ch >= " " && ch <= "~") {
+          onlineHostName += ch;
+        }
+        return;
+      }
+    }
+    if (e.code === "Enter" || e.code === "Space") {
+      playSfx("menuConfirm");
+      if (onlineHostSelection === 1) {
+        // Connect as host.
+        const name = (onlineHostName || "Host").trim();
+        gameState = GAME_STATE.ONLINE_LOBBY;
+        screenEnterTime = performance.now();
+        netOnlineHost("ws://localhost:8787", name);
+      } else if (onlineHostSelection === 2) {
+        startTransition(GAME_STATE.ONLINE_MENU);
+      }
+      return;
+    }
+    return;
+  }
+
+  if (gameState === GAME_STATE.ONLINE_JOIN) {
+    if (e.code === "Escape") {
+      // Back out to online menu.
+      playSfx("menuBack");
+      startTransition(GAME_STATE.ONLINE_MENU);
+      return;
+    }
+    const maxFields = 4; // name, code, connect, back
+    if (e.code === "ArrowDown") {
+      playSfx("menuSelect");
+      onlineJoinSelection = (onlineJoinSelection + 1) % maxFields;
+      return;
+    }
+    if (e.code === "ArrowUp") {
+      playSfx("menuSelect");
+      onlineJoinSelection = (onlineJoinSelection - 1 + maxFields) % maxFields;
+      return;
+    }
+    // Text input only when focused on name or code.
+    if (onlineJoinSelection === 0 || onlineJoinSelection === 1) {
+      if (e.code === "Backspace") {
+        if (onlineJoinSelection === 0 && onlineJoinName.length) onlineJoinName = onlineJoinName.slice(0, -1);
+        else if (onlineJoinSelection === 1 && onlineJoinCode.length) onlineJoinCode = onlineJoinCode.slice(0, -1);
+        return;
+      }
+      if (e.key && e.key.length === 1) {
+        const ch = e.key;
+        // Restrict code to uppercase letters/numbers; name can be any visible char.
+        if (onlineJoinSelection === 0) {
+          if (onlineJoinName.length < 16 && ch >= " " && ch <= "~") {
+            onlineJoinName += ch;
+          }
+        } else {
+          const up = ch.toUpperCase();
+          if (onlineJoinCode.length < 8 && /[A-Z0-9]/.test(up)) {
+            onlineJoinCode += up;
+          }
+        }
+        return;
+      }
+    }
+    if (e.code === "Enter" || e.code === "Space") {
+      playSfx("menuConfirm");
+      if (onlineJoinSelection === 2) {
+        // Connect.
+        const name = (onlineJoinName || "Guest").trim();
+        const code = (onlineJoinCode || "").trim();
+        if (code) {
+          gameState = GAME_STATE.ONLINE_LOBBY;
+          screenEnterTime = performance.now();
+          netOnlineJoin(DEFAULT_JOIN_SERVER_URL, code, name);
+        }
+      } else if (onlineJoinSelection === 3) {
+        startTransition(GAME_STATE.ONLINE_MENU);
+      }
+      return;
+    }
+    return;
   }
 
   if (gameState === GAME_STATE.SETTINGS) {
@@ -246,10 +387,7 @@ window.addEventListener("keydown", (e) => {
   }
 
   if (gameState === GAME_STATE.VERSUS_INTRO) {
-    if (e.code === "Enter" || e.code === "Space") {
-      playSfx("menuConfirm");
-      startTransition(GAME_STATE.TRANSITION);
-    }
+    // No manual skip: VS intro always flows into countdown automatically to keep both sides in sync.
     return;
   }
 
@@ -282,9 +420,23 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "ArrowUp") { playSfx("menuSelect"); roundOverSelection = (roundOverSelection - 1 + 3) % 3; return; }
     if (e.code === "Enter" || e.code === "Space" || (e.code === "KeyR" && roundOverSelection === 0)) {
       playSfx("menuConfirm");
-      if (roundOverSelection === 0) { roundOver = false; roundOverWinner = null; goToTransition(); }
-      else if (roundOverSelection === 1) { gameState = GAME_STATE.VERSUS_SELECT; roundOver = false; roundOverWinner = null; }
-      else { goToMenu(); roundOver = false; roundOverWinner = null; }
+      const isOnline = typeof netcodeIsEnabled === "function" && netcodeIsEnabled();
+      if (roundOverSelection === 0) {
+        // Restart / rematch.
+        roundOver = false; roundOverWinner = null;
+        goToTransition();
+      } else if (roundOverSelection === 1) {
+        if (isOnline) {
+          // Back to lobby for online play.
+          roundOver = false; roundOverWinner = null;
+          gameState = GAME_STATE.ONLINE_LOBBY;
+        } else {
+          // Local change characters.
+          gameState = GAME_STATE.VERSUS_SELECT; roundOver = false; roundOverWinner = null;
+        }
+      } else {
+        goToMenu(); roundOver = false; roundOverWinner = null;
+      }
     }
     return;
   }
@@ -309,6 +461,172 @@ window.addEventListener("click", () => {
     playSfx("menuConfirm");
     startTransition(GAME_STATE.MENU);
     menuSelection = 0;
+  }
+});
+
+function _getCanvasCoordsFromMouseEvent(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY,
+  };
+}
+
+canvas.addEventListener("mousedown", (e) => {
+  const { x, y } = _getCanvasCoordsFromMouseEvent(e);
+
+  // Main menu: click options.
+  if (gameState === GAME_STATE.MENU) {
+    const options = ["Local 2P Versus", "Online Versus (room code)", "Practice (vs Dummy)", "Tutorial", "Settings", "Credits"];
+    const baseY = WORLD.height * 0.5;
+    const lineH = 50;
+    const cx = WORLD.width / 2;
+    for (let i = 0; i < options.length; i++) {
+      const oy = baseY + i * lineH;
+      const hitX = Math.abs(x - cx) <= WORLD.width * 0.3;
+      const hitY = y >= oy - 22 && y <= oy + 22;
+      if (hitX && hitY) {
+        menuSelection = i;
+        playSfx("menuConfirm");
+        if (i === 0) {
+          startTransition(GAME_STATE.VERSUS_SELECT);
+          p1CharacterIndex = 0; p2CharacterIndex = 0; p1ColorIndex = 0; p2ColorIndex = 0;
+        } else if (i === 1) {
+          startTransition(GAME_STATE.ONLINE_MENU);
+          onlineMenuSelection = 0;
+        } else if (i === 2) {
+          startPractice();
+        } else if (i === 3) {
+          startTutorial();
+        } else if (i === 4) {
+          startTransition(GAME_STATE.SETTINGS);
+          settingsSelection = 0;
+        } else if (i === 5) {
+          startTransition(GAME_STATE.CREDITS);
+        }
+        return;
+      }
+    }
+  }
+
+  // Online menu: click options.
+  if (gameState === GAME_STATE.ONLINE_MENU) {
+    const options = ["Host room", "Join room", "Back"];
+    const startY = 240;
+    const lineH = 56;
+    const cx = WORLD.width / 2;
+    for (let i = 0; i < options.length; i++) {
+      const oy = startY + i * lineH;
+      const hitX = Math.abs(x - cx) <= WORLD.width * 0.3;
+      const hitY = y >= oy - 24 && y <= oy + 24;
+      if (hitX && hitY) {
+        onlineMenuSelection = i;
+        playSfx("menuConfirm");
+        if (i === 0) {
+          const suggested = (typeof netcodeGetLobbyState === "function" && netcodeGetLobbyState().localName) || "Host";
+          onlineHostName = suggested;
+          onlineHostSelection = 0;
+          gameState = GAME_STATE.ONLINE_HOST;
+          screenEnterTime = performance.now();
+        } else if (i === 1) {
+          onlineJoinName = "";
+          onlineJoinCode = "";
+          onlineJoinSelection = 0;
+          gameState = GAME_STATE.ONLINE_JOIN;
+          screenEnterTime = performance.now();
+        } else {
+          startTransition(GAME_STATE.MENU);
+        }
+        return;
+      }
+    }
+  }
+
+  // Online host: click field / buttons.
+  if (gameState === GAME_STATE.ONLINE_HOST) {
+    const fieldY = WORLD.height * 0.38;
+    const fx = WORLD.width * 0.24;
+    const fw = WORLD.width * 0.52;
+    const fh = 34;
+    // Name field.
+    if (x >= fx && x <= fx + fw && y >= fieldY && y <= fieldY + fh) {
+      onlineHostSelection = 0;
+      return;
+    }
+    // Buttons.
+    const btnY = fieldY + 64;
+    const btnW = 150;
+    const btnH = 34;
+    const centerX = WORLD.width / 2;
+    const createX = centerX - 90 - btnW / 2;
+    const backX = centerX + 90 - btnW / 2;
+    if (y >= btnY && y <= btnY + btnH) {
+      if (x >= createX && x <= createX + btnW) {
+        onlineHostSelection = 1;
+        playSfx("menuConfirm");
+        const name = (onlineHostName || "Host").trim();
+        gameState = GAME_STATE.ONLINE_LOBBY;
+        screenEnterTime = performance.now();
+        netOnlineHost("ws://localhost:8787", name);
+        return;
+      }
+      if (x >= backX && x <= backX + btnW) {
+        onlineHostSelection = 2;
+        playSfx("menuBack");
+        startTransition(GAME_STATE.ONLINE_MENU);
+        return;
+      }
+    }
+  }
+
+  // Online join: click fields / buttons.
+  if (gameState === GAME_STATE.ONLINE_JOIN) {
+    const startY = WORLD.height * 0.35;
+    const lineH = 54;
+    const fx = WORLD.width * 0.24;
+    const fw = WORLD.width * 0.52;
+    const fh = 34;
+    // Name field.
+    const nameY = startY;
+    if (x >= fx && x <= fx + fw && y >= nameY && y <= nameY + fh) {
+      onlineJoinSelection = 0;
+      return;
+    }
+    // Code field.
+    const codeY = startY + lineH;
+    if (x >= fx && x <= fx + fw && y >= codeY && y <= codeY + fh) {
+      onlineJoinSelection = 1;
+      return;
+    }
+    // Buttons.
+    const btnY = startY + 2 * lineH + 12;
+    const btnW = 150;
+    const btnH = 34;
+    const centerX = WORLD.width / 2;
+    const connectX = centerX - 90 - btnW / 2;
+    const backX = centerX + 90 - btnW / 2;
+    if (y >= btnY && y <= btnY + btnH) {
+      if (x >= connectX && x <= connectX + btnW) {
+        onlineJoinSelection = 2;
+        playSfx("menuConfirm");
+        const name = (onlineJoinName || "Guest").trim();
+        const code = (onlineJoinCode || "").trim();
+        if (code) {
+          gameState = GAME_STATE.ONLINE_LOBBY;
+          screenEnterTime = performance.now();
+          netOnlineJoin(DEFAULT_JOIN_SERVER_URL, code, name);
+        }
+        return;
+      }
+      if (x >= backX && x <= backX + btnW) {
+        onlineJoinSelection = 3;
+        playSfx("menuBack");
+        startTransition(GAME_STATE.ONLINE_MENU);
+        return;
+      }
+    }
   }
 });
 

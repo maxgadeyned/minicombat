@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="preload" href="menu-music.mp3" as="audio" />
+  <link rel="preload" href="menu-music.mp3" as="fetch" />
   <title>Miniature Combat</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -45,7 +45,7 @@
 </head>
 <body>
   <div id="gameContainer">
-    <canvas id="gameCanvas" width="1200" height="700"></canvas>
+    <canvas id="gameCanvas" width="1200" height="700" tabindex="0"></canvas>
     <div id="hud">
       <span>Dummy: <span id="dummyDamage">0%</span></span>
       <span>Player: <span id="playerDamage">0%</span></span>

@@ -2,10 +2,12 @@
 "use strict";
 
 const { WebSocketServer } = require("ws");
+const runGame = require("./runGame.js");
 
 const PORT = Number(process.env.PORT || 8787);
+const TICK_MS = 1000 / 60;
 
-/** @type {Map<string, {host: import('ws').WebSocket, join: import('ws').WebSocket | null}>} */
+/** @type {Map<string, {host: import('ws').WebSocket, join: import('ws').WebSocket | null, pendingSignals: any[], state: any, loop: NodeJS.Timer | null, matchRunning: boolean, lastP1Bits: number, lastP2Bits: number}>} */
 const rooms = new Map();
 
 function randomCode(len = 5) {
@@ -31,6 +33,10 @@ function send(ws, obj) {
 function cleanupRoom(code, reason) {
   const room = rooms.get(code);
   if (!room) return;
+  if (room.loop) {
+    clearInterval(room.loop);
+  }
+  room.state = null;
   rooms.delete(code);
   const msg = reason || "Room closed";
   try { send(room.host, { type: "error", message: msg }); } catch (_) {}
@@ -41,8 +47,8 @@ function cleanupRoom(code, reason) {
   }
 }
 
-const wss = new WebSocketServer({ port: PORT });
-console.log(`[signaling] ws://localhost:${PORT}`);
+const wss = new WebSocketServer({ host: "0.0.0.0", port: PORT });
+console.log(`[signaling] listening on port ${PORT} (ws://localhost:${PORT})`);
 
 wss.on("connection", (ws) => {
   console.log("[signaling] Client connected");
@@ -55,12 +61,13 @@ wss.on("connection", (ws) => {
     if (!msg || typeof msg !== "object") return;
 
     if (msg.type === "createRoom") {
-      console.log("[signaling] createRoom received, sending roomCreated");
       const code = createUniqueRoomCode();
-      rooms.set(code, { host: ws, join: null, pendingSignals: [] });
+      console.log("[signaling] createRoom received, sending roomCreated code:", code);
+      rooms.set(code, { host: ws, join: null, pendingSignals: [], state: null, loop: null, matchRunning: false, lastP1Bits: 0, lastP2Bits: 0 });
       ws._roomCode = code;
       ws._role = "host";
-      send(ws, { type: "roomCreated", code });
+      const payload = { type: "roomCreated", code };
+      send(ws, payload);
       return;
     }
 
@@ -79,6 +86,44 @@ wss.on("connection", (ws) => {
         send(ws, { type: "signal", data: sig.data });
       }
       room.pendingSignals = [];
+      return;
+    }
+
+    // Game messages: server-authoritative sim (HaxBall-style).
+    if (msg.type === "game") {
+      const code = String(msg.code || ws._roomCode || "").trim().toUpperCase();
+      const room = rooms.get(code);
+      if (!room) { send(ws, { type: "error", message: "Room not found" }); return; }
+      const data = msg.data || {};
+
+      if (data.t === "i") {
+        if (ws === room.host) room.lastP1Bits = data.b | 0;
+        else if (ws === room.join) room.lastP2Bits = data.b | 0;
+        return;
+      }
+      if (data.t === "versusGo" && data.state) {
+        room.state = data.state;
+        room.matchRunning = true;
+        room.lastP1Bits = 0;
+        room.lastP2Bits = 0;
+        if (room.join) send(room.join, { type: "game", data: { t: "versusGo", state: data.state } });
+        if (!room.loop) {
+          room.loop = setInterval(() => {
+            if (!room.matchRunning || !room.state) return;
+            try {
+              room.state = runGame.step(room.state, room.lastP1Bits, room.lastP2Bits);
+              if (room.host) send(room.host, { type: "game", data: { t: "state", state: room.state } });
+              if (room.join) send(room.join, { type: "game", data: { t: "state", state: room.state } });
+            } catch (err) {
+              console.error("[signaling] step error:", err);
+            }
+          }, TICK_MS);
+        }
+        return;
+      }
+
+      const target = ws === room.host ? room.join : room.host;
+      if (target) send(target, { type: "game", data });
       return;
     }
 

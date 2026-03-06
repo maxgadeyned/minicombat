@@ -1,5 +1,7 @@
 "use strict";
 
+// In the browser, WORLD/PLATFORM etc. come from config.js (loaded first).
+// In Node (server/runGame), server/config.js sets global.WORLD before this file is required.
 function createFighter(options) {
   return {
     pos: { x: options.x, y: options.y },
@@ -120,4 +122,22 @@ let currentComboCount = 0;
 let lastComboHitTime = 0;
 let currentComboDamage = 0;
 const COMBO_RESET_MS = 900;
+
+if (typeof global !== "undefined") {
+  global.player = player;
+  global.player2 = player2;
+  global.dummy = dummy;
+  global.createFighter = createFighter;
+  global.createFighterForType = createFighterForType;
+  global.applyPlayerTypeTo = applyPlayerTypeTo;
+  global.PLAYER_TYPES = PLAYER_TYPES;
+  global.COLOR_PALETTE = COLOR_PALETTE;
+  global.playerStart = playerStart;
+  global.player2Start = player2Start;
+  global.COMBO_RESET_MS = COMBO_RESET_MS;
+}
+if (typeof window !== "undefined") {
+  window.PLAYER_TYPES = PLAYER_TYPES;
+  window.COLOR_PALETTE = COLOR_PALETTE;
+}
 
