@@ -651,9 +651,31 @@ function netcodeJoinerSendInput() {
   netcodeSendInput();
 }
 
+/** Serialize our fighter for server sync (used when we've respawned and may be ahead of server). */
+function _serializeOurFighter() {
+  const f = netRole === NET_PLAYERS.HOST ? (typeof player !== "undefined" ? player : null) : (typeof player2 !== "undefined" ? player2 : null);
+  if (!f) return null;
+  const simNow = typeof simNowMs === "function" ? simNowMs() : 0;
+  // Only send when we've respawned (respawnAt cleared) and we're in/just past invuln - server may be behind
+  if (f.respawnAt) return null;
+  if (!f.invulnUntil || simNow > f.invulnUntil + 1500) return null;
+  return {
+    pos: { x: f.pos.x, y: f.pos.y },
+    prevPos: { x: f.prevPos.x, y: f.prevPos.y },
+    vel: { x: f.vel.x, y: f.vel.y },
+    facing: f.facing,
+    onGround: f.onGround,
+    respawnAt: f.respawnAt || 0,
+    invulnUntil: f.invulnUntil || 0,
+  };
+}
+
 /** Server-authoritative: both host and joiner send input every frame; state comes from server. */
 function netcodeSendInput() {
   if (!netEnabled || netRole == null || gameState !== GAME_STATE.VERSUS) return;
-  _sendDC({ t: "i", f: typeof simFrame !== "undefined" ? simFrame : 0, b: _localBitsForThisPeer() | 0 });
+  const payload = { t: "i", f: typeof simFrame !== "undefined" ? simFrame : 0, b: _localBitsForThisPeer() | 0 };
+  const fighter = _serializeOurFighter();
+  if (fighter) payload.fighter = fighter;
+  _sendDC(payload);
 }
 

@@ -129,6 +129,18 @@ wss.on("connection", (ws) => {
       if (data.t === "i") {
         if (ws === room.host) room.lastP1Bits = data.b | 0;
         else if (ws === room.join) room.lastP2Bits = data.b | 0;
+        // Client may send fighter state when respawned (client ahead of server) - merge into room state
+        if (data.fighter && room.state && room.state.player && room.state.player2) {
+          const target = ws === room.host ? room.state.player : room.state.player2;
+          const src = data.fighter;
+          if (src.pos) { target.pos.x = src.pos.x; target.pos.y = src.pos.y; }
+          if (src.prevPos) { target.prevPos.x = src.prevPos.x; target.prevPos.y = src.prevPos.y; }
+          if (src.vel) { target.vel.x = src.vel.x; target.vel.y = src.vel.y; }
+          if (typeof src.facing === "number") target.facing = src.facing;
+          if (typeof src.onGround === "boolean") target.onGround = src.onGround;
+          if (typeof src.respawnAt === "number") target.respawnAt = src.respawnAt;
+          if (typeof src.invulnUntil === "number") target.invulnUntil = src.invulnUntil;
+        }
         return;
       }
       if (data.t === "versusGo" && data.state) {
