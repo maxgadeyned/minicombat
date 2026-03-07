@@ -144,12 +144,12 @@ wss.on("connection", (ws) => {
             try {
               room.state = getRunGame().step(room.state, room.lastP1Bits, room.lastP2Bits);
               room.tickCount = (room.tickCount || 0) + 1;
-              if (room.tickCount % STATE_SEND_INTERVAL === 0) {
-                if (room.host) send(room.host, { type: "game", data: { t: "state", state: room.state } });
-                if (room.join) send(room.join, { type: "game", data: { t: "state", state: room.state } });
-              }
             } catch (err) {
               console.error("[signaling] step error:", err);
+            }
+            if (room.tickCount % STATE_SEND_INTERVAL === 0 && room.state) {
+              if (room.host) send(room.host, { type: "game", data: { t: "state", state: room.state } });
+              if (room.join) send(room.join, { type: "game", data: { t: "state", state: room.state } });
             }
           }, TICK_MS);
         }

@@ -107,7 +107,10 @@ function loop(now) {
   if (isOnlineVersus) {
     if (typeof netcodeSendInput === "function") netcodeSendInput();
     const interp = typeof netcodeGetInterpolatedState === "function" ? netcodeGetInterpolatedState(now) : null;
-    if (interp && typeof loadState === "function") loadState(interp);
+    if (interp && typeof loadState === "function") {
+      loadState(interp);
+      if (typeof netcodeApplyLocalPrediction === "function") netcodeApplyLocalPrediction();
+    }
   } else {
     const isJoiner = typeof netcodeIsEnabled === "function" && netcodeIsEnabled() && typeof netcodeGetStats === "function" && netcodeGetStats().role === "join";
     if (!isJoiner) {

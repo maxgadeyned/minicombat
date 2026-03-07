@@ -255,6 +255,18 @@ function _lerpFighter(out, a, b, t) {
   out.vel.y = _lerp(a.vel.y, b.vel.y, t);
 }
 
+/** Run 1 frame of local prediction for our character so input feels immediate. Call after loadState when in online versus. */
+function netcodeApplyLocalPrediction() {
+  if (!netEnabled || gameState !== GAME_STATE.VERSUS || roundOver || gamePaused) return;
+  if (typeof stepGameplay !== "function" || typeof simFrame === "undefined") return;
+  const ourBits = _localBitsForThisPeer() | 0;
+  const now = (simFrame | 0) * (typeof SIM_FRAME_MS !== "undefined" ? SIM_FRAME_MS : 1000 / 60);
+  let dt = 1 / 60;
+  if (typeof koSlowmoUntil !== "undefined" && typeof KO_SLOWMO_SCALE !== "undefined" && now < koSlowmoUntil) dt *= KO_SLOWMO_SCALE;
+  if (netRole === NET_PLAYERS.HOST) stepGameplay(dt, now, ourBits, 0);
+  else stepGameplay(dt, now, 0, ourBits);
+}
+
 /** Returns interpolated state for smooth rendering, or null if none available. Call before draw when in online versus. */
 function netcodeGetInterpolatedState(now) {
   if (netStateBuffer.length === 0) return null;
