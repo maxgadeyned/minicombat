@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 "use strict";
 
+const http = require("http");
 const { WebSocketServer } = require("ws");
 const runGame = require("./runGame.js");
 
@@ -49,8 +50,14 @@ function cleanupRoom(code, reason) {
   }
 }
 
-const wss = new WebSocketServer({ host: "0.0.0.0", port: PORT });
-console.log(`[signaling] listening on port ${PORT} (ws://localhost:${PORT})`);
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("Miniature Combat server – connect via WebSocket (wss://)");
+});
+const wss = new WebSocketServer({ server });
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`[signaling] listening on port ${PORT} (ws://localhost:${PORT})`);
+});
 
 wss.on("connection", (ws) => {
   console.log("[signaling] Client connected");
