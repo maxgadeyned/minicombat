@@ -40,7 +40,7 @@ function integrateFighter(fighter, dt, nowMs) {
     fighter.lastJumpWasDouble = false;
     if ((fighter === player || fighter === player2) && prevBottom < plat.y) {
       playSfx("land");
-      if (!(typeof window !== "undefined" && window._netPredictionMode)) hitEffects.push({ type: "dust", x: fighter.pos.x, y: PLATFORM.y, createdAt: nowMs, duration: 220 });
+      hitEffects.push({ type: "dust", x: fighter.pos.x, y: PLATFORM.y, createdAt: nowMs, duration: 220 });
     }
   }
 

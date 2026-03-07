@@ -253,26 +253,40 @@ function _lerpFighter(out, a, b, t) {
   out.vel.y = _lerp(a.vel.y, b.vel.y, t);
 }
 
-/** Run 1 frame of silent local prediction (no sounds/effects) for responsive feel. */
-function netcodeApplyLocalPrediction() {
-  if (!netEnabled || gameState !== GAME_STATE.VERSUS || roundOver || gamePaused) return;
-  if (typeof stepGameplay !== "function" || typeof simFrame === "undefined") return;
-  const savedLen = typeof hitEffects !== "undefined" ? hitEffects.length : 0;
-  if (typeof window !== "undefined") window._netPredictionMode = true;
-  try {
-    const ourBits = _localBitsForThisPeer() | 0;
-    const now = (simFrame | 0) * (typeof SIM_FRAME_MS !== "undefined" ? SIM_FRAME_MS : 1000 / 60);
-    let dt = 1 / 60;
-    if (typeof koSlowmoUntil !== "undefined" && typeof KO_SLOWMO_SCALE !== "undefined" && now < koSlowmoUntil) dt *= KO_SLOWMO_SCALE;
-    if (netRole === NET_PLAYERS.HOST) stepGameplay(dt, now, ourBits, 0);
-    else stepGameplay(dt, now, 0, ourBits);
-  } finally {
-    if (typeof window !== "undefined") window._netPredictionMode = false;
-    if (typeof hitEffects !== "undefined" && hitEffects.length > savedLen) hitEffects.length = savedLen;
-  }
+function _copyFighter(target, src) {
+  if (!target || !src) return;
+  target.pos.x = src.pos.x; target.pos.y = src.pos.y;
+  target.prevPos.x = src.prevPos.x; target.prevPos.y = src.prevPos.y;
+  target.vel.x = src.vel.x; target.vel.y = src.vel.y;
+  target.damage = src.damage; target.onGround = src.onGround; target.facing = src.facing;
+  target.jumpsRemaining = src.jumpsRemaining; target.blocking = src.blocking;
+  target.respawnAt = src.respawnAt; target.invulnUntil = src.invulnUntil;
+  target.stunnedUntil = src.stunnedUntil; target.parryWindowUntil = src.parryWindowUntil;
+  target.parryLockoutUntil = src.parryLockoutUntil; target.rollingUntil = src.rollingUntil;
+  target.rollInvulnUntil = src.rollInvulnUntil; target.nextLightAt = src.nextLightAt;
+  target.nextHeavyAt = src.nextHeavyAt; target.nextSpecialAt = src.nextSpecialAt;
 }
 
-/** Returns latest server state for rendering. HaxBall-style: show authoritative state with minimal delay. */
+/** Apply server state for opponent + combat only. Keeps our character from local sim. Call after stepGameplay. */
+function netcodeApplyServerStateForOpponentAndCombat() {
+  if (netStateBuffer.length === 0) return;
+  const s = netStateBuffer[netStateBuffer.length - 1].state;
+  if (!s) return;
+  const opp = netRole === NET_PLAYERS.HOST ? s.player2 : s.player;
+  if (opp) _copyFighter(netRole === NET_PLAYERS.HOST ? player2 : player, opp);
+  playerStocks = s.playerStocks ?? playerStocks;
+  player2Stocks = s.player2Stocks ?? player2Stocks;
+  roundOver = s.roundOver ?? roundOver;
+  roundOverSelection = s.roundOverSelection ?? roundOverSelection;
+  roundOverStartTime = s.roundOverStartTime ?? roundOverStartTime;
+  roundOverWinner = s.roundOverWinner ?? roundOverWinner;
+  if (s.player) player.damage = s.player.damage;
+  if (s.player2) player2.damage = s.player2.damage;
+  hitEffects.length = 0;
+  for (const e of s.hitEffects || []) hitEffects.push({ ...e });
+}
+
+/** Returns latest server state for initial load. For online: we run local sim and apply opponent from server. */
 function netcodeGetInterpolatedState(now) {
   if (netStateBuffer.length === 0) return null;
   return netStateBuffer[netStateBuffer.length - 1].state;
