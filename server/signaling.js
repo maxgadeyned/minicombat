@@ -6,8 +6,10 @@ const runGame = require("./runGame.js");
 
 const PORT = Number(process.env.PORT || 8787);
 const TICK_MS = 1000 / 60;
+/** Send state every N ticks (1 = 60Hz, 2 = 30Hz). Higher = less bandwidth, slightly more latency. */
+const STATE_SEND_INTERVAL = 1;
 
-/** @type {Map<string, {host: import('ws').WebSocket, join: import('ws').WebSocket | null, pendingSignals: any[], state: any, loop: NodeJS.Timer | null, matchRunning: boolean, lastP1Bits: number, lastP2Bits: number}>} */
+/** @type {Map<string, {host: import('ws').WebSocket, join: import('ws').WebSocket | null, pendingSignals: any[], state: any, loop: NodeJS.Timer | null, matchRunning: boolean, lastP1Bits: number, lastP2Bits: number, tickCount?: number}>} */
 const rooms = new Map();
 
 function randomCode(len = 5) {
@@ -108,12 +110,16 @@ wss.on("connection", (ws) => {
         room.lastP2Bits = 0;
         if (room.join) send(room.join, { type: "game", data: { t: "versusGo", state: data.state } });
         if (!room.loop) {
+          room.tickCount = 0;
           room.loop = setInterval(() => {
             if (!room.matchRunning || !room.state) return;
             try {
               room.state = runGame.step(room.state, room.lastP1Bits, room.lastP2Bits);
-              if (room.host) send(room.host, { type: "game", data: { t: "state", state: room.state } });
-              if (room.join) send(room.join, { type: "game", data: { t: "state", state: room.state } });
+              room.tickCount = (room.tickCount || 0) + 1;
+              if (room.tickCount % STATE_SEND_INTERVAL === 0) {
+                if (room.host) send(room.host, { type: "game", data: { t: "state", state: room.state } });
+                if (room.join) send(room.join, { type: "game", data: { t: "state", state: room.state } });
+              }
             } catch (err) {
               console.error("[signaling] step error:", err);
             }

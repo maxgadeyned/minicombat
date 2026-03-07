@@ -52,6 +52,11 @@ let netHostVersusGoTimer = null;
 // Host-authoritative: host uses latest P2 input received from joiner.
 let netLatestRemoteInput = 0;
 
+// Client-side interpolation: buffer server states and render between them for smoother movement.
+const NET_INTERP_DELAY_MS = 80;
+const NET_STATE_BUFFER_MAX = 10;
+let netStateBuffer = [];
+
 function netcodeReset() {
   netEnabled = false;
   netRole = null;
@@ -75,6 +80,7 @@ function netcodeReset() {
   netStageIsRandom = false;
   for (let i = 0; i < netStateHistory.length; i++) netStateHistory[i] = null;
 
+  netStateBuffer = [];
   if (netHostReadyTimeout != null) { clearTimeout(netHostReadyTimeout); netHostReadyTimeout = null; }
   if (netHostVersusGoTimer != null) { clearTimeout(netHostVersusGoTimer); netHostVersusGoTimer = null; }
   try { if (netDataChannel) netDataChannel.close(); } catch (_) {}
@@ -158,7 +164,9 @@ function _handleDCMessage(msg) {
     netcodeEnqueueRemoteInput(msg.f | 0, msg.b | 0);
     if (netRole === NET_PLAYERS.HOST) netLatestRemoteInput = msg.b | 0;
   } else if (msg.t === "state" && msg.state) {
-    if (typeof loadState === "function") loadState(msg.state);
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    netStateBuffer.push({ state: msg.state, receivedAt: now });
+    while (netStateBuffer.length > NET_STATE_BUFFER_MAX) netStateBuffer.shift();
   } else if (msg.t === "name") {
     if (typeof msg.name === "string") netRemoteName = msg.name.slice(0, 16);
   } else if (msg.t === "char") {
@@ -220,13 +228,58 @@ function _handleDCMessage(msg) {
     // Joiner: server says match started; enter VERSUS and apply initial state if provided.
     if (netRole === NET_PLAYERS.JOIN) {
       if (gameState === GAME_STATE.VERSUS_INTRO && typeof goToTransition === "function") goToTransition();
-      if (msg.state && typeof loadState === "function") loadState(msg.state);
+      if (msg.state) {
+        if (typeof loadState === "function") loadState(msg.state);
+        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        netStateBuffer.push({ state: msg.state, receivedAt: now });
+      }
       gameState = GAME_STATE.VERSUS;
     }
   } else if (msg.t === "serverTick") {
     // Temporary debug: log server-driven frame number.
     console.log("[net] serverTick frame:", msg.f);
   }
+}
+
+function _lerp(a, b, t) {
+  return a + (b - a) * Math.max(0, Math.min(1, t));
+}
+
+function _lerpFighter(out, a, b, t) {
+  if (!out || !a || !b) return;
+  out.pos.x = _lerp(a.pos.x, b.pos.x, t);
+  out.pos.y = _lerp(a.pos.y, b.pos.y, t);
+  out.prevPos.x = _lerp(a.prevPos.x, b.prevPos.x, t);
+  out.prevPos.y = _lerp(a.prevPos.y, b.prevPos.y, t);
+  out.vel.x = _lerp(a.vel.x, b.vel.x, t);
+  out.vel.y = _lerp(a.vel.y, b.vel.y, t);
+}
+
+/** Returns interpolated state for smooth rendering, or null if none available. Call before draw when in online versus. */
+function netcodeGetInterpolatedState(now) {
+  if (netStateBuffer.length === 0) return null;
+  const renderTime = now - NET_INTERP_DELAY_MS;
+  const first = netStateBuffer[0];
+  if (netStateBuffer.length === 1 || renderTime <= first.receivedAt) {
+    return first.state;
+  }
+  const last = netStateBuffer[netStateBuffer.length - 1];
+  if (renderTime >= last.receivedAt) return last.state;
+  let s1 = first, s2 = first;
+  for (let i = 0; i < netStateBuffer.length - 1; i++) {
+    if (netStateBuffer[i].receivedAt <= renderTime && renderTime <= netStateBuffer[i + 1].receivedAt) {
+      s1 = netStateBuffer[i];
+      s2 = netStateBuffer[i + 1];
+      break;
+    }
+  }
+  const dt = s2.receivedAt - s1.receivedAt;
+  const alpha = dt > 0 ? (renderTime - s1.receivedAt) / dt : 1;
+  const merged = JSON.parse(JSON.stringify(s2.state));
+  if (s1.state.player && s2.state.player) _lerpFighter(merged.player, s1.state.player, s2.state.player, alpha);
+  if (s1.state.player2 && s2.state.player2) _lerpFighter(merged.player2, s1.state.player2, s2.state.player2, alpha);
+  if (s1.state.dummy && s2.state.dummy) _lerpFighter(merged.dummy, s1.state.dummy, s2.state.dummy, alpha);
+  return merged;
 }
 
 let netIceQueue = [];

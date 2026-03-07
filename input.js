@@ -164,7 +164,7 @@ window.addEventListener("keydown", (e) => {
         const name = (onlineHostName || "Host").trim();
         gameState = GAME_STATE.ONLINE_LOBBY;
         screenEnterTime = performance.now();
-        netOnlineHost("ws://localhost:8787", name);
+        netOnlineHost(getServerUrl(), name);
       } else if (onlineHostSelection === 2) {
         startTransition(GAME_STATE.ONLINE_MENU);
       }
@@ -223,7 +223,7 @@ window.addEventListener("keydown", (e) => {
         if (code) {
           gameState = GAME_STATE.ONLINE_LOBBY;
           screenEnterTime = performance.now();
-          netOnlineJoin(DEFAULT_JOIN_SERVER_URL, code, name);
+          netOnlineJoin(getServerUrl(), code, name);
         }
       } else if (onlineJoinSelection === 3) {
         startTransition(GAME_STATE.ONLINE_MENU);
@@ -569,7 +569,7 @@ canvas.addEventListener("mousedown", (e) => {
         const name = (onlineHostName || "Host").trim();
         gameState = GAME_STATE.ONLINE_LOBBY;
         screenEnterTime = performance.now();
-        netOnlineHost("ws://localhost:8787", name);
+        netOnlineHost(getServerUrl(), name);
         return;
       }
       if (x >= backX && x <= backX + btnW) {
@@ -616,7 +616,7 @@ canvas.addEventListener("mousedown", (e) => {
         if (code) {
           gameState = GAME_STATE.ONLINE_LOBBY;
           screenEnterTime = performance.now();
-          netOnlineJoin(DEFAULT_JOIN_SERVER_URL, code, name);
+          netOnlineJoin(getServerUrl(), code, name);
         }
         return;
       }

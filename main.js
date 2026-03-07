@@ -104,8 +104,10 @@ function loop(now) {
 
   // Server-authoritative (HaxBall-style): in online versus nobody runs the sim; both send input and apply server state.
   const isOnlineVersus = typeof netcodeIsEnabled === "function" && netcodeIsEnabled() && gameState === GAME_STATE.VERSUS;
-  if (isOnlineVersus && typeof netcodeSendInput === "function") {
-    netcodeSendInput();
+  if (isOnlineVersus) {
+    if (typeof netcodeSendInput === "function") netcodeSendInput();
+    const interp = typeof netcodeGetInterpolatedState === "function" ? netcodeGetInterpolatedState(now) : null;
+    if (interp && typeof loadState === "function") loadState(interp);
   } else {
     const isJoiner = typeof netcodeIsEnabled === "function" && netcodeIsEnabled() && typeof netcodeGetStats === "function" && netcodeGetStats().role === "join";
     if (!isJoiner) {

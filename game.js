@@ -69,9 +69,16 @@ function getTransitionOverlayAlpha() {
 
 let menuSelection = 0;
 let onlineMenuSelection = 0;
-const DEFAULT_SIGNALING_URL = "ws://localhost:8787";
-/** On the JOINER's copy: set this to the HOST's public IP, e.g. "ws://79.52.187.20:8787" (use ws:// not http://). */
-const DEFAULT_JOIN_SERVER_URL = "ws://79.35.184.181:8787";
+/** WebSocket server URL for online play. Use ws:// for local, wss:// for Railway/production. Override via ?server=wss://your-app.railway.app */
+const DEFAULT_SERVER_URL = "ws://localhost:8787";
+function getServerUrl() {
+  if (typeof URLSearchParams !== "undefined") {
+    const p = new URLSearchParams(location.search);
+    const s = p.get("server");
+    if (s && (s.startsWith("ws://") || s.startsWith("wss://"))) return s;
+  }
+  return DEFAULT_SERVER_URL;
+}
 let settingsSelection = 0;
 let p2SettingsSelection = 0;
 let p2SettingsFromSettings = false;
@@ -151,22 +158,34 @@ function _cloneFighter(f) {
 }
 
 function saveState() {
+  const g = typeof global !== "undefined" ? global : null;
+  const sim = g ? g.simFrame : simFrame;
+  const p = g ? g.player : player;
+  const p2 = g ? g.player2 : player2;
+  const d = g ? g.dummy : dummy;
+  const pStocks = g ? g.playerStocks : playerStocks;
+  const p2Stocks = g ? g.player2Stocks : player2Stocks;
+  const dStocks = g ? g.dummyStocks : dummyStocks;
+  const rOver = g ? g.roundOver : roundOver;
+  const rOverSel = g ? g.roundOverSelection : roundOverSelection;
+  const rOverStart = g ? g.roundOverStartTime : roundOverStartTime;
+  const rOverWin = g ? g.roundOverWinner : roundOverWinner;
   return {
-    simFrame,
+    simFrame: sim,
 
     // Entities
-    player: _cloneFighter(player),
-    player2: _cloneFighter(player2),
-    dummy: _cloneFighter(dummy),
+    player: _cloneFighter(p),
+    player2: p2 ? _cloneFighter(p2) : null,
+    dummy: _cloneFighter(d),
 
     // Global match state
-    playerStocks,
-    player2Stocks,
-    dummyStocks,
-    roundOver,
-    roundOverSelection,
-    roundOverStartTime,
-    roundOverWinner,
+    playerStocks: pStocks,
+    player2Stocks: p2Stocks,
+    dummyStocks: dStocks,
+    roundOver: rOver,
+    roundOverSelection: rOverSel,
+    roundOverStartTime: rOverStart,
+    roundOverWinner: rOverWin,
     gamePaused,
     pauseMenuSelection,
     bestComboCount,

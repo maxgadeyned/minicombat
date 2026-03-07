@@ -1,0 +1,13 @@
+{
+  "name": "miniture-combat",
+  "private": true,
+  "scripts": {
+    "start": "node server/signaling.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}

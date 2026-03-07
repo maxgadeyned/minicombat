@@ -1339,10 +1339,10 @@ function draw(now) {
     ctx.font = "bold 30px system-ui";
     ctx.fillStyle = damageColor(p1Damage);
     ctx.fillText(`${p1Damage}%`, pad + portraitSize + 14, topY + 44);
-    ctx.font = "16px system-ui";
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    const p1StocksStr = "●".repeat(Math.max(0, Math.min(playerStocks, MAX_STOCKS)));
-    ctx.fillText(`Stocks: ${p1StocksStr}`, pad + portraitSize + 14, topY + 68);
+    ctx.font = "18px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    const p1StocksStr = "●".repeat(Math.max(0, Math.min(playerStocks, MAX_STOCKS))) + "○".repeat(Math.max(0, MAX_STOCKS - playerStocks));
+    ctx.fillText(p1StocksStr, pad + portraitSize + 14, topY + 68);
 
     // P2 HUD (right)
     const rightPad = 24;
@@ -1355,10 +1355,10 @@ function draw(now) {
     ctx.font = "bold 30px system-ui";
     ctx.fillStyle = damageColor(p2Damage);
     ctx.fillText(`${p2Damage}%`, rightX - portraitSize - 14, topY + 44);
-    ctx.font = "16px system-ui";
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    const p2StocksStr = "●".repeat(Math.max(0, Math.min(player2Stocks, MAX_STOCKS)));
-    ctx.fillText(`Stocks: ${p2StocksStr}`, rightX - portraitSize - 14, topY + 68);
+    ctx.font = "18px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    const p2StocksStr = "●".repeat(Math.max(0, Math.min(player2Stocks, MAX_STOCKS))) + "○".repeat(Math.max(0, MAX_STOCKS - player2Stocks));
+    ctx.fillText(p2StocksStr, rightX - portraitSize - 14, topY + 68);
   } else {
     // Practice / single-player HUD: same style, player vs dummy
     const pDamage = Math.round(player.damage);
@@ -1381,10 +1381,10 @@ function draw(now) {
     ctx.font = "bold 30px system-ui";
     ctx.fillStyle = damageColor(pDamage);
     ctx.fillText(`${pDamage}%`, pad + portraitSize + 14, topY + 44);
-    ctx.font = "16px system-ui";
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    const pStocksStr = "●".repeat(Math.max(0, Math.min(playerStocks, MAX_STOCKS)));
-    ctx.fillText(`Stocks: ${pStocksStr}`, pad + portraitSize + 14, topY + 68);
+    ctx.font = "18px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    const pStocksStr = "●".repeat(Math.max(0, Math.min(playerStocks, MAX_STOCKS))) + "○".repeat(Math.max(0, MAX_STOCKS - playerStocks));
+    ctx.fillText(pStocksStr, pad + portraitSize + 14, topY + 68);
 
     // Dummy HUD (right)
     const rightPad = 24;
@@ -1397,10 +1397,10 @@ function draw(now) {
     ctx.font = "bold 30px system-ui";
     ctx.fillStyle = damageColor(dDamage);
     ctx.fillText(`${dDamage}%`, rightX - portraitSize - 14, topY + 44);
-    ctx.font = "16px system-ui";
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    const dStocksStr = "●".repeat(Math.max(0, Math.min(dummyStocks, MAX_STOCKS)));
-    ctx.fillText(`Stocks: ${dStocksStr}`, rightX - portraitSize - 14, topY + 68);
+    ctx.font = "18px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    const dStocksStr = "●".repeat(Math.max(0, Math.min(dummyStocks, MAX_STOCKS))) + "○".repeat(Math.max(0, MAX_STOCKS - dummyStocks));
+    ctx.fillText(dStocksStr, rightX - portraitSize - 14, topY + 68);
 
     // Dummy mode hint centered under HUD
     ctx.textAlign = "center";
