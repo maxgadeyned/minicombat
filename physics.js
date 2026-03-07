@@ -12,6 +12,7 @@ function integrateFighter(fighter, dt, nowMs) {
   if (nowMs == null) nowMs = performance.now();
 
   if (fighter.respawnAt && nowMs < fighter.respawnAt) return;
+  if (fighter.respawnAt && nowMs >= fighter.respawnAt) fighter.respawnAt = 0;
 
   fighter.prevPos.x = fighter.pos.x;
   fighter.prevPos.y = fighter.pos.y;
@@ -39,7 +40,7 @@ function integrateFighter(fighter, dt, nowMs) {
     fighter.lastJumpWasDouble = false;
     if ((fighter === player || fighter === player2) && prevBottom < plat.y) {
       playSfx("land");
-      hitEffects.push({ type: "dust", x: fighter.pos.x, y: PLATFORM.y, createdAt: nowMs, duration: 220 });
+      if (!(typeof window !== "undefined" && window._netPredictionMode)) hitEffects.push({ type: "dust", x: fighter.pos.x, y: PLATFORM.y, createdAt: nowMs, duration: 220 });
     }
   }
 

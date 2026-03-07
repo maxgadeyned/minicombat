@@ -52,8 +52,6 @@ let netHostVersusGoTimer = null;
 // Host-authoritative: host uses latest P2 input received from joiner.
 let netLatestRemoteInput = 0;
 
-// Client-side interpolation: buffer server states and render between them. Lower = less input delay, more jitter.
-const NET_INTERP_DELAY_MS = 30;
 const NET_STATE_BUFFER_MAX = 10;
 let netStateBuffer = [];
 
@@ -255,44 +253,29 @@ function _lerpFighter(out, a, b, t) {
   out.vel.y = _lerp(a.vel.y, b.vel.y, t);
 }
 
-/** Run 1 frame of local prediction for our character so input feels immediate. Call after loadState when in online versus. */
+/** Run 1 frame of silent local prediction (no sounds/effects) for responsive feel. */
 function netcodeApplyLocalPrediction() {
   if (!netEnabled || gameState !== GAME_STATE.VERSUS || roundOver || gamePaused) return;
   if (typeof stepGameplay !== "function" || typeof simFrame === "undefined") return;
-  const ourBits = _localBitsForThisPeer() | 0;
-  const now = (simFrame | 0) * (typeof SIM_FRAME_MS !== "undefined" ? SIM_FRAME_MS : 1000 / 60);
-  let dt = 1 / 60;
-  if (typeof koSlowmoUntil !== "undefined" && typeof KO_SLOWMO_SCALE !== "undefined" && now < koSlowmoUntil) dt *= KO_SLOWMO_SCALE;
-  if (netRole === NET_PLAYERS.HOST) stepGameplay(dt, now, ourBits, 0);
-  else stepGameplay(dt, now, 0, ourBits);
+  const savedLen = typeof hitEffects !== "undefined" ? hitEffects.length : 0;
+  if (typeof window !== "undefined") window._netPredictionMode = true;
+  try {
+    const ourBits = _localBitsForThisPeer() | 0;
+    const now = (simFrame | 0) * (typeof SIM_FRAME_MS !== "undefined" ? SIM_FRAME_MS : 1000 / 60);
+    let dt = 1 / 60;
+    if (typeof koSlowmoUntil !== "undefined" && typeof KO_SLOWMO_SCALE !== "undefined" && now < koSlowmoUntil) dt *= KO_SLOWMO_SCALE;
+    if (netRole === NET_PLAYERS.HOST) stepGameplay(dt, now, ourBits, 0);
+    else stepGameplay(dt, now, 0, ourBits);
+  } finally {
+    if (typeof window !== "undefined") window._netPredictionMode = false;
+    if (typeof hitEffects !== "undefined" && hitEffects.length > savedLen) hitEffects.length = savedLen;
+  }
 }
 
-/** Returns interpolated state for smooth rendering, or null if none available. Call before draw when in online versus. */
+/** Returns latest server state for rendering. HaxBall-style: show authoritative state with minimal delay. */
 function netcodeGetInterpolatedState(now) {
   if (netStateBuffer.length === 0) return null;
-  const delay = netStateBuffer.length >= 3 ? NET_INTERP_DELAY_MS : 0;
-  const renderTime = now - delay;
-  const first = netStateBuffer[0];
-  if (netStateBuffer.length === 1 || renderTime <= first.receivedAt) {
-    return first.state;
-  }
-  const last = netStateBuffer[netStateBuffer.length - 1];
-  if (renderTime >= last.receivedAt) return last.state;
-  let s1 = first, s2 = first;
-  for (let i = 0; i < netStateBuffer.length - 1; i++) {
-    if (netStateBuffer[i].receivedAt <= renderTime && renderTime <= netStateBuffer[i + 1].receivedAt) {
-      s1 = netStateBuffer[i];
-      s2 = netStateBuffer[i + 1];
-      break;
-    }
-  }
-  const dt = s2.receivedAt - s1.receivedAt;
-  const alpha = dt > 0 ? (renderTime - s1.receivedAt) / dt : 1;
-  const merged = JSON.parse(JSON.stringify(s2.state));
-  if (s1.state.player && s2.state.player) _lerpFighter(merged.player, s1.state.player, s2.state.player, alpha);
-  if (s1.state.player2 && s2.state.player2) _lerpFighter(merged.player2, s1.state.player2, s2.state.player2, alpha);
-  if (s1.state.dummy && s2.state.dummy) _lerpFighter(merged.dummy, s1.state.dummy, s2.state.dummy, alpha);
-  return merged;
+  return netStateBuffer[netStateBuffer.length - 1].state;
 }
 
 let netIceQueue = [];

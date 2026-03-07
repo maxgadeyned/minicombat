@@ -75,6 +75,7 @@ function stopMenuMusic() {
 }
 
 function playSfx(type) {
+  if (typeof window !== "undefined" && window._netPredictionMode) return;
   if (!audioCtx) ensureAudio();
   if (!audioCtx) return;
   if (!sfxGainNode) {
