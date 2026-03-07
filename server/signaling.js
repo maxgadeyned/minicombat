@@ -5,9 +5,13 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const { WebSocketServer } = require("ws");
-const runGame = require("./runGame.js");
 
 const PORT = Number(process.env.PORT || 8787);
+let runGame = null;
+function getRunGame() {
+  if (!runGame) runGame = require("./runGame.js");
+  return runGame;
+}
 const STATIC_ROOT = path.join(__dirname, "..");
 const MIME = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".mp3": "audio/mpeg", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json" };
 const TICK_MS = 1000 / 60;
@@ -138,7 +142,7 @@ wss.on("connection", (ws) => {
           room.loop = setInterval(() => {
             if (!room.matchRunning || !room.state) return;
             try {
-              room.state = runGame.step(room.state, room.lastP1Bits, room.lastP2Bits);
+              room.state = getRunGame().step(room.state, room.lastP1Bits, room.lastP2Bits);
               room.tickCount = (room.tickCount || 0) + 1;
               if (room.tickCount % STATE_SEND_INTERVAL === 0) {
                 if (room.host) send(room.host, { type: "game", data: { t: "state", state: room.state } });
