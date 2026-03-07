@@ -267,7 +267,7 @@ function _copyFighter(target, src) {
   target.nextHeavyAt = src.nextHeavyAt; target.nextSpecialAt = src.nextSpecialAt;
 }
 
-/** Apply server state for opponent + combat only. Keeps our character from local sim. Call after stepGameplay. */
+/** Apply server state for opponent + combat only. Never overwrites our character - pure local sim. */
 function netcodeApplyServerStateForOpponentAndCombat() {
   if (netStateBuffer.length === 0) return;
   const s = netStateBuffer[netStateBuffer.length - 1].state;
@@ -282,11 +282,22 @@ function netcodeApplyServerStateForOpponentAndCombat() {
   roundOverWinner = s.roundOverWinner ?? roundOverWinner;
   if (s.player) player.damage = s.player.damage;
   if (s.player2) player2.damage = s.player2.damage;
+  koSlowmoUntil = s.koSlowmoUntil ?? koSlowmoUntil;
+  koFlashUntil = s.koFlashUntil ?? koFlashUntil;
+  hitstopUntil = s.hitstopUntil ?? hitstopUntil;
+  shakeUntil = s.shakeUntil ?? shakeUntil;
+  shakeMagnitude = s.shakeMagnitude ?? shakeMagnitude;
+  const serverNow = (s.simFrame || 0) * (typeof SIM_FRAME_MS !== "undefined" ? SIM_FRAME_MS : 1000 / 60);
   hitEffects.length = 0;
-  for (const e of s.hitEffects || []) hitEffects.push({ ...e });
+  for (const e of s.hitEffects || []) {
+    const age = serverNow - (e.createdAt || 0);
+    if (age <= (e.duration || 9999)) hitEffects.push({ ...e });
+  }
 }
 
-/** Returns latest server state for initial load. For online: we run local sim and apply opponent from server. */
+function netcodeHasServerState() { return netStateBuffer.length > 0; }
+
+/** Returns latest server state for initial load. */
 function netcodeGetInterpolatedState(now) {
   if (netStateBuffer.length === 0) return null;
   return netStateBuffer[netStateBuffer.length - 1].state;

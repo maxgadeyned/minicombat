@@ -102,24 +102,26 @@ function loop(now) {
     return;
   }
 
-  // Online versus: client-side movement for our character (lag-free), server state for opponent + combat.
+  // Online versus: pure local sim (feels like singleplayer). Server only for opponent + combat.
   const isOnlineVersus = typeof netcodeIsEnabled === "function" && netcodeIsEnabled() && gameState === GAME_STATE.VERSUS;
   if (isOnlineVersus) {
     if (typeof netcodeSendInput === "function") netcodeSendInput();
-    const interp = typeof netcodeGetInterpolatedState === "function" ? netcodeGetInterpolatedState(now) : null;
-    if (interp && typeof loadState === "function") {
-      loadState(interp);
-      while (accumulatorMs >= SIM_FRAME_MS) {
-        const simNow = simNowMs();
-        let dtScaled = SIM_DT;
-        if (simNow < koSlowmoUntil) dtScaled *= KO_SLOWMO_SCALE;
-        const ourBits = typeof _localBitsForThisPeer === "function" ? _localBitsForThisPeer() | 0 : 0;
-        const isHost = typeof netcodeGetStats === "function" && netcodeGetStats().role === "host";
-        stepGameplay(dtScaled, simNow, isHost ? ourBits : 0, isHost ? 0 : ourBits);
-        simFrame++;
-        accumulatorMs -= SIM_FRAME_MS;
-        if (typeof netcodeApplyServerStateForOpponentAndCombat === "function") netcodeApplyServerStateForOpponentAndCombat();
-      }
+    const hasState = typeof netcodeHasServerState === "function" && netcodeHasServerState();
+    if (!hasState) {
+      const interp = typeof netcodeGetInterpolatedState === "function" ? netcodeGetInterpolatedState(now) : null;
+      if (interp && typeof loadState === "function") loadState(interp);
+    }
+    if (typeof netcodeApplyServerStateForOpponentAndCombat === "function") netcodeApplyServerStateForOpponentAndCombat();
+    while (accumulatorMs >= SIM_FRAME_MS) {
+      const simNow = simNowMs();
+      let dtScaled = SIM_DT;
+      if (simNow < koSlowmoUntil) dtScaled *= KO_SLOWMO_SCALE;
+      const ourBits = typeof _localBitsForThisPeer === "function" ? _localBitsForThisPeer() | 0 : 0;
+      const isHost = typeof netcodeGetStats === "function" && netcodeGetStats().role === "host";
+      stepGameplay(dtScaled, simNow, isHost ? ourBits : 0, isHost ? 0 : ourBits);
+      simFrame++;
+      accumulatorMs -= SIM_FRAME_MS;
+      if (typeof netcodeApplyServerStateForOpponentAndCombat === "function") netcodeApplyServerStateForOpponentAndCombat();
     }
   } else {
     const isJoiner = typeof netcodeIsEnabled === "function" && netcodeIsEnabled() && typeof netcodeGetStats === "function" && netcodeGetStats().role === "join";

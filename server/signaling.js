@@ -148,8 +148,11 @@ wss.on("connection", (ws) => {
               console.error("[signaling] step error:", err);
             }
             if (room.tickCount % STATE_SEND_INTERVAL === 0 && room.state) {
-              if (room.host) send(room.host, { type: "game", data: { t: "state", state: room.state } });
-              if (room.join) send(room.join, { type: "game", data: { t: "state", state: room.state } });
+              const state = { ...room.state };
+              const now = (state.simFrame || 0) * TICK_MS;
+              state.hitEffects = (state.hitEffects || []).filter(e => (now - (e.createdAt || 0)) <= (e.duration || 9999));
+              if (room.host) send(room.host, { type: "game", data: { t: "state", state } });
+              if (room.join) send(room.join, { type: "game", data: { t: "state", state } });
             }
           }, TICK_MS);
         }
