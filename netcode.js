@@ -52,8 +52,8 @@ let netHostVersusGoTimer = null;
 // Host-authoritative: host uses latest P2 input received from joiner.
 let netLatestRemoteInput = 0;
 
-// Client-side interpolation: buffer server states and render between them for smoother movement.
-const NET_INTERP_DELAY_MS = 80;
+// Client-side interpolation: buffer server states and render between them. Lower = less input delay, more jitter.
+const NET_INTERP_DELAY_MS = 30;
 const NET_STATE_BUFFER_MAX = 10;
 let netStateBuffer = [];
 
@@ -258,7 +258,8 @@ function _lerpFighter(out, a, b, t) {
 /** Returns interpolated state for smooth rendering, or null if none available. Call before draw when in online versus. */
 function netcodeGetInterpolatedState(now) {
   if (netStateBuffer.length === 0) return null;
-  const renderTime = now - NET_INTERP_DELAY_MS;
+  const delay = netStateBuffer.length >= 3 ? NET_INTERP_DELAY_MS : 0;
+  const renderTime = now - delay;
   const first = netStateBuffer[0];
   if (netStateBuffer.length === 1 || renderTime <= first.receivedAt) {
     return first.state;
