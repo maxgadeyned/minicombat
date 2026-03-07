@@ -69,13 +69,17 @@ function getTransitionOverlayAlpha() {
 
 let menuSelection = 0;
 let onlineMenuSelection = 0;
-/** WebSocket server URL for online play. Use ws:// for local, wss:// for Railway/production. Override via ?server=wss://your-app.railway.app */
+/** WebSocket server URL for online play. When game is served from same host (e.g. Railway), uses wss:// automatically. Override via ?server=wss://... */
 const DEFAULT_SERVER_URL = "ws://localhost:8787";
 function getServerUrl() {
   if (typeof URLSearchParams !== "undefined") {
     const p = new URLSearchParams(location.search);
     const s = p.get("server");
     if (s && (s.startsWith("ws://") || s.startsWith("wss://"))) return s;
+  }
+  if (typeof location !== "undefined" && location.hostname && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    return protocol + "//" + location.host;
   }
   return DEFAULT_SERVER_URL;
 }

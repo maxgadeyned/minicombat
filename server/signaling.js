@@ -1,11 +1,15 @@
 /* eslint-disable no-console */
 "use strict";
 
+const fs = require("fs");
+const path = require("path");
 const http = require("http");
 const { WebSocketServer } = require("ws");
 const runGame = require("./runGame.js");
 
 const PORT = Number(process.env.PORT || 8787);
+const STATIC_ROOT = path.join(__dirname, "..");
+const MIME = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".mp3": "audio/mpeg", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json" };
 const TICK_MS = 1000 / 60;
 /** Send state every N ticks (1 = 60Hz, 2 = 30Hz). Higher = less bandwidth, slightly more latency. */
 const STATE_SEND_INTERVAL = 1;
@@ -51,8 +55,21 @@ function cleanupRoom(code, reason) {
 }
 
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-  res.end("Miniature Combat server – connect via WebSocket (wss://)");
+  let urlPath = (req.url || "/").split("?")[0];
+  if (urlPath === "/") urlPath = "/index.html";
+  const safePath = urlPath.replace(/\.\./g, "").replace(/^\//, "");
+  const filePath = path.join(STATIC_ROOT, safePath);
+  const ext = path.extname(filePath);
+  const contentType = MIME[ext] || "application/octet-stream";
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("Not found");
+      return;
+    }
+    res.writeHead(200, { "Content-Type": contentType + (ext === ".html" || ext === ".js" ? "; charset=utf-8" : "") });
+    res.end(data);
+  });
 });
 const wss = new WebSocketServer({ server });
 server.listen(PORT, "0.0.0.0", () => {
