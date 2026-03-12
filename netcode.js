@@ -55,7 +55,7 @@ let netLatestRemoteInput = 0;
 const NET_STATE_BUFFER_MAX = 10;
 let netStateBuffer = [];
 
-// Net transport mode: "central_server" (current default) or "p2p_host_authoritative" (experimental).
+// Net transport mode: "central_server" (current default) or host-authoritative P2P (experimental).
 // This is derived from the global onlineP2PEnabled flag defined in game.js.
 function _netcodeIsP2PMode() {
   return typeof onlineP2PEnabled !== "undefined" && !!onlineP2PEnabled;
@@ -67,6 +67,31 @@ function netcodeIsP2PHost() {
 
 function netcodeIsP2PJoiner() {
   return _netcodeIsP2PMode() && netRole === NET_PLAYERS.JOIN;
+}
+
+const P2P_RTC_CONFIG = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+  ],
+};
+
+let p2pLatestHostState = null;
+
+function _handleP2PMessage(msg) {
+  const t = msg.t;
+  if (t === "input") {
+    // Joiner -> host: remote input bits.
+    if (netcodeIsP2PHost() && typeof msg.b === "number") {
+      netLatestRemoteInput = msg.b | 0;
+    }
+  } else if (t === "state") {
+    // Host -> joiner: authoritative state snapshot.
+    if (netcodeIsP2PJoiner() && msg.s && typeof msg.s === "object") {
+      p2pLatestHostState = msg.s;
+    }
+  } else if (t === "meta") {
+    // Reserved for ping/pong or control; ignore for now.
+  }
 }
 
 function netcodeReset() {
@@ -319,9 +344,134 @@ function netcodeGetInterpolatedState(now) {
 
 let netIceQueue = [];
 
-function _createPeerCommon() {}
-async function _drainIceQueue() {}
-function _queueOrAddIce() {}
+function _createPeerCommon() {
+  if (typeof RTCPeerConnection === "undefined") {
+    console.warn("[net] RTCPeerConnection not available; P2P mode disabled in this environment.");
+    return null;
+  }
+  if (netPeer) {
+    try { netPeer.close(); } catch (_) {}
+    netPeer = null;
+  }
+  netIceQueue = [];
+  const pc = new RTCPeerConnection(P2P_RTC_CONFIG);
+  netPeer = pc;
+  pc.onicecandidate = (ev) => {
+    if (ev.candidate) _queueOrAddIce(ev.candidate);
+  };
+  pc.onconnectionstatechange = () => {
+    console.log("[net] Peer connection state:", pc.connectionState);
+  };
+  pc.oniceconnectionstatechange = () => {
+    console.log("[net] ICE state:", pc.iceConnectionState);
+  };
+  return pc;
+}
+
+async function _drainIceQueue() {
+  if (!netPeer || !netIceQueue.length) return;
+  const queued = netIceQueue.slice();
+  netIceQueue = [];
+  for (const cand of queued) {
+    try {
+      await netPeer.addIceCandidate(cand);
+    } catch (err) {
+      console.warn("[net] Failed to add queued ICE candidate:", err);
+    }
+  }
+}
+
+function _queueOrAddIce(candidate) {
+  if (!candidate) return;
+  if (!netPeer || !netPeer.remoteDescription) {
+    netIceQueue.push(candidate);
+    return;
+  }
+  netPeer.addIceCandidate(candidate).catch((err) => {
+    console.warn("[net] Failed to add ICE candidate:", err);
+  });
+}
+
+function _sendSignal(data) {
+  if (!netSignaling || netSignaling.readyState !== WebSocket.OPEN || !netRoomCode) return;
+  netSignaling.send(JSON.stringify({ type: "signal", code: netRoomCode, data }));
+}
+
+function _setupP2PDataChannel(dc) {
+  netDataChannel = dc;
+  dc.onopen = () => {
+    console.log("[net] DataChannel open, label=", dc.label);
+  };
+  dc.onclose = () => {
+    console.log("[net] DataChannel closed");
+    netDataChannel = null;
+  };
+  dc.onerror = (err) => {
+    console.warn("[net] DataChannel error:", err);
+  };
+  dc.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch (_) { return; }
+    if (!msg || typeof msg !== "object") return;
+    _handleP2PMessage(msg);
+  };
+}
+
+async function netP2PCreateHostPeer() {
+  if (!_netcodeIsP2PMode()) return;
+  const pc = _createPeerCommon();
+  if (!pc) return;
+  const dc = pc.createDataChannel("game");
+  _setupP2PDataChannel(dc);
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    _sendSignal({ type: "offer", sdp: { type: offer.type, sdp: offer.sdp } });
+  } catch (err) {
+    console.error("[net] Failed to create/send offer:", err);
+  }
+}
+
+async function _handleSignalMessage(data) {
+  if (!data || typeof data !== "object") return;
+  const kind = data.type;
+  if (kind === "offer") {
+    if (!_netcodeIsP2PMode()) return;
+    const pc = _createPeerCommon();
+    if (!pc) return;
+    pc.ondatachannel = (ev) => {
+      _setupP2PDataChannel(ev.channel);
+    };
+    try {
+      const desc = new RTCSessionDescription(data.sdp);
+      await pc.setRemoteDescription(desc);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      _sendSignal({ type: "answer", sdp: { type: answer.type, sdp: answer.sdp } });
+      await _drainIceQueue();
+    } catch (err) {
+      console.error("[net] Failed to handle offer:", err);
+    }
+  } else if (kind === "answer") {
+    if (!netPeer) return;
+    try {
+      const desc = new RTCSessionDescription(data.sdp);
+      await netPeer.setRemoteDescription(desc);
+      await _drainIceQueue();
+    } catch (err) {
+      console.error("[net] Failed to handle answer:", err);
+    }
+  } else if (kind === "ice") {
+    if (data.candidate) {
+      try {
+        const cand = new RTCIceCandidate(data.candidate);
+        _queueOrAddIce(cand);
+      } catch (err) {
+        console.warn("[net] Failed to create ICE candidate from signal:", err);
+      }
+    }
+  }
+}
 
 function netOnlineHost(signalingUrl, displayName) {
   netcodeReset();
@@ -350,8 +500,14 @@ function netOnlineHost(signalingUrl, displayName) {
       _setConn("connected");
       if (netLocalName) _sendDC({ t: "name", name: netLocalName });
       if (netLocalCharIndex != null) _sendDC({ t: "char", idx: netLocalCharIndex | 0 });
+      // In P2P mode, immediately start WebRTC offer once a peer is present.
+      if (_netcodeIsP2PMode()) {
+        netP2PCreateHostPeer();
+      }
     } else if (msg.type === "game") {
       _handleDCMessage(msg.data);
+    } else if (msg.type === "signal") {
+      _handleSignalMessage(msg.data);
     } else if (msg.type === "error") {
       _setConn("error", msg.message || "Signaling error");
     }
@@ -389,6 +545,8 @@ function netOnlineJoin(signalingUrl, code, displayName) {
       if (netLocalCharIndex != null) _sendDC({ t: "char", idx: netLocalCharIndex | 0 });
     } else if (msg.type === "game") {
       _handleDCMessage(msg.data);
+    } else if (msg.type === "signal") {
+      _handleSignalMessage(msg.data);
     } else if (msg.type === "error") {
       _setConn("error", msg.message || "Signaling error");
     }
@@ -658,6 +816,48 @@ function netcodeStepOneFrame(frame) {
   const currentKeys = _localBitsForThisPeer();
   _setInputHistory(f, currentKeys);
   _sendDC({ t: "i", f, b: currentKeys | 0 });
+}
+
+function netP2PHostStepFrame(frame) {
+  if (!netcodeIsP2PHost()) return;
+  if (!netDataChannel || netDataChannel.readyState !== "open") return;
+  if (gameState !== GAME_STATE.VERSUS) return;
+  if (roundOver || gamePaused) return;
+  const f = frame | 0;
+  const localBits = _localBitsForThisPeer();
+  const remoteBits = netLatestRemoteInput | 0;
+  const now = f * SIM_FRAME_MS;
+  let dtScaled = SIM_DT;
+  if (now < koSlowmoUntil) dtScaled *= KO_SLOWMO_SCALE;
+  stepGameplay(dtScaled, now, localBits, remoteBits);
+  if ((f % NET_STATE_SEND_INTERVAL_FRAMES) === 0) {
+    const snapshot = typeof saveState === "function" ? saveState() : null;
+    if (snapshot) {
+      try {
+        netDataChannel.send(JSON.stringify({ t: "state", f, s: snapshot }));
+      } catch (err) {
+        console.warn("[net] Failed to send P2P state:", err);
+      }
+    }
+  }
+}
+
+function netP2PJoinerSendInput(frame) {
+  if (!netcodeIsP2PJoiner()) return;
+  if (!netDataChannel || netDataChannel.readyState !== "open") return;
+  if (gameState !== GAME_STATE.VERSUS) return;
+  if (roundOver || gamePaused) return;
+  const f = frame | 0;
+  const bits = _localBitsForThisPeer() | 0;
+  try {
+    netDataChannel.send(JSON.stringify({ t: "input", f, b: bits }));
+  } catch (err) {
+    console.warn("[net] Failed to send P2P input:", err);
+  }
+}
+
+function netP2PGetLatestHostState() {
+  return p2pLatestHostState;
 }
 
 function netcodeJoinerSendInput() {

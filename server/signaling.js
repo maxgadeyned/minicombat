@@ -119,7 +119,7 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    // Game messages: server-authoritative sim (HaxBall-style).
+    // Game messages: server-authoritative sim (default) or lobby/game control.
     if (msg.type === "game") {
       const code = String(msg.code || ws._roomCode || "").trim().toUpperCase();
       const room = rooms.get(code);
@@ -144,6 +144,8 @@ wss.on("connection", (ws) => {
         return;
       }
       if (data.t === "versusGo" && data.state) {
+        // In P2P mode the clients ignore server-driven simulation, but we keep the old
+        // server-side loop for central-server matches. P2P clients simply won't send input.
         room.state = data.state;
         room.matchRunning = true;
         room.lastP1Bits = 0;

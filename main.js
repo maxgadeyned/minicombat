@@ -102,9 +102,41 @@ function loop(now) {
     return;
   }
 
-  // Online versus: pure local sim (feels like singleplayer). Server only for opponent + combat.
-  const isOnlineVersus = typeof netcodeIsEnabled === "function" && netcodeIsEnabled() && gameState === GAME_STATE.VERSUS;
-  if (isOnlineVersus) {
+  // Online versus.
+  const netEnabled = typeof netcodeIsEnabled === "function" && netcodeIsEnabled();
+  const isOnlineVersus = netEnabled && gameState === GAME_STATE.VERSUS;
+  const isP2PHost = netEnabled && typeof netcodeIsP2PHost === "function" && netcodeIsP2PHost();
+  const isP2PJoiner = netEnabled && typeof netcodeIsP2PJoiner === "function" && netcodeIsP2PJoiner();
+
+  if (isOnlineVersus && (isP2PHost || isP2PJoiner)) {
+    // Experimental P2P host-authoritative mode.
+    if (isP2PHost && typeof netP2PHostStepFrame === "function") {
+      while (accumulatorMs >= SIM_FRAME_MS) {
+        const frame = typeof simFrame !== "undefined" ? simFrame : 0;
+        netP2PHostStepFrame(frame);
+        simFrame++;
+        accumulatorMs -= SIM_FRAME_MS;
+      }
+    } else if (isP2PJoiner) {
+      // Joiner: send inputs to host and consume latest host state snapshots.
+      if (typeof netP2PJoinerSendInput === "function") {
+        while (accumulatorMs >= SIM_FRAME_MS) {
+          const frame = typeof simFrame !== "undefined" ? simFrame : 0;
+          netP2PJoinerSendInput(frame);
+          simFrame++;
+          accumulatorMs -= SIM_FRAME_MS;
+        }
+      } else {
+        // Drain accumulator even if helper missing.
+        while (accumulatorMs >= SIM_FRAME_MS) accumulatorMs -= SIM_FRAME_MS;
+      }
+      if (typeof netP2PGetLatestHostState === "function") {
+        const s = netP2PGetLatestHostState();
+        if (s && typeof loadState === "function") loadState(s);
+      }
+    }
+  } else if (isOnlineVersus) {
+    // Central server authoritative mode (current default): server provides opponent + combat.
     if (typeof netcodeSendInput === "function") netcodeSendInput();
     const hasState = typeof netcodeHasServerState === "function" && netcodeHasServerState();
     if (!hasState) {
