@@ -69,6 +69,8 @@ function getTransitionOverlayAlpha() {
 
 let menuSelection = 0;
 let onlineMenuSelection = 0;
+// Online netplay mode toggle: false = central server authoritative, true = P2P host-authoritative.
+let onlineP2PEnabled = false;
 /** WebSocket server URL for online play. When game is served from same host (e.g. Railway), uses wss:// automatically. Override via ?server=wss://... */
 const DEFAULT_SERVER_URL = "ws://localhost:8787";
 function getServerUrl() {

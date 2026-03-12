@@ -59,6 +59,12 @@ window.addEventListener("keydown", (e) => {
   if (gameState === GAME_STATE.ONLINE_MENU) {
     const menuCount = 3;
     if (e.code === "Escape" || e.code === "Backspace") { playSfx("menuBack"); startTransition(GAME_STATE.MENU); return; }
+    if (e.code === "KeyM") {
+      // Toggle experimental net mode (central server vs P2P host-authoritative).
+      playSfx("menuSelect");
+      if (typeof onlineP2PEnabled !== "undefined") onlineP2PEnabled = !onlineP2PEnabled;
+      return;
+    }
     if (e.code === "ArrowDown") { playSfx("menuSelect"); onlineMenuSelection = (onlineMenuSelection + 1) % menuCount; return; }
     if (e.code === "ArrowUp") { playSfx("menuSelect"); onlineMenuSelection = (onlineMenuSelection - 1 + menuCount) % menuCount; return; }
     if (e.code === "Enter" || e.code === "Space") {

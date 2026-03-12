@@ -274,9 +274,17 @@ function drawOnlineMenu(now) {
     ctx.restore();
   }
 
+  // Experimental net mode toggle indicator (server vs P2P). Toggled via keyboard in ONLINE_MENU.
+  ctx.font = "14px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  const modeLabel = (typeof onlineP2PEnabled !== "undefined" && onlineP2PEnabled)
+    ? "Net mode: Host P2P (experimental)"
+    : "Net mode: Central server (default)";
+  ctx.fillText(modeLabel, WORLD.width / 2, startY + options.length * lineH + 18);
+
   ctx.font = "13px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.fillText("↑↓ Select  •  Enter / Space Confirm  •  Esc Back", WORLD.width / 2, WORLD.height * 0.82);
+  ctx.fillText("↑↓ Select  •  Enter / Space Confirm  •  Esc Back  •  M Toggle net mode", WORLD.width / 2, WORLD.height * 0.82);
   ctx.restore();
 }
 

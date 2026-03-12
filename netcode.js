@@ -55,6 +55,20 @@ let netLatestRemoteInput = 0;
 const NET_STATE_BUFFER_MAX = 10;
 let netStateBuffer = [];
 
+// Net transport mode: "central_server" (current default) or "p2p_host_authoritative" (experimental).
+// This is derived from the global onlineP2PEnabled flag defined in game.js.
+function _netcodeIsP2PMode() {
+  return typeof onlineP2PEnabled !== "undefined" && !!onlineP2PEnabled;
+}
+
+function netcodeIsP2PHost() {
+  return _netcodeIsP2PMode() && netRole === NET_PLAYERS.HOST;
+}
+
+function netcodeIsP2PJoiner() {
+  return _netcodeIsP2PMode() && netRole === NET_PLAYERS.JOIN;
+}
+
 function netcodeReset() {
   netEnabled = false;
   netRole = null;
